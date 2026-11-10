@@ -137,7 +137,9 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 /* screen power overlay and the fold rig */
 .power { position: absolute; inset: 0; z-index: 8; pointer-events: none;
   background: linear-gradient(115deg, #0b0c0f 0%, #17191e 38%, #0a0b0d 62%, #121418 100%); }
-.rig { position: absolute; z-index: 20; perspective: 2200px; transform-style: preserve-3d; pointer-events: none; }
+.rig { position: absolute; z-index: 20; perspective: 2200px; transform-style: preserve-3d; pointer-events: none; will-change: transform; }
+.rig .flap { will-change: transform; }
+.rig .shade { position: absolute; inset: 0; border-radius: inherit; background: #000; opacity: 0; pointer-events: none; }
 .rig .half, .rig .flap { position: absolute; transform-style: preserve-3d; }
 .rig .face { position: absolute; inset: 0; backface-visibility: hidden; }
 .rig .half, .rig .face { background:
@@ -275,4 +277,8 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .toast.show img { animation: bob .6s steps(2) infinite; }
 .toast::after { content: "▼"; position: absolute; right: 12px; bottom: 9px; font-size: 14px; animation: blink .8s steps(1) infinite; }
 .toast.show { opacity: 1; }
+/* respect the system "reduce motion" setting for decorative loops */
+@media (prefers-reduced-motion: reduce) {
+  .logo .mascot, .toast.show img, .slot.active .caption .name::before, .rec-live .dot { animation: none !important; }
+}
 `;

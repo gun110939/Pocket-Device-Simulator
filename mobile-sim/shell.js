@@ -426,9 +426,11 @@
     v.busy = true;
     const inst = state.devices[i];
     const deg = inst.landscape ? 90 : -90; // portrait -> landscape turns counter-clockwise
+    v.body.style.willChange = 'transform';
     await finished(v.body.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${deg}deg)` }],
       { duration: 480, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'forwards' }));
     v.body.getAnimations().forEach((a) => a.cancel());
+    v.body.style.willChange = '';
     reshape(i, { landscape: !inst.landscape });
     layout();
     v.busy = false;
@@ -477,7 +479,8 @@
 
     const rig = el('div', 'rig ' + (vertical ? 'v' : 'h'), v.device);
     Object.assign(rig.style, { left: left + 'px', top: top + 'px', width: W + 'px', height: H + 'px', '--r': R + 'px' });
-    rig.innerHTML = '<div class="half"></div><div class="flap"><div class="face front"></div><div class="face back"><i></i></div></div>';
+    // Lighting uses opacity on a dark layer per face: cheap to composite, unlike animating filter.
+    rig.innerHTML = '<div class="half"><b class="shade"></b></div><div class="flap"><div class="face front"><b class="shade"></b></div><div class="face back"><i></i><b class="shade"></b></div></div>';
     const flap = rig.querySelector('.flap');
     const front = rig.querySelector('.front');
     const back = rig.querySelector('.back');
@@ -502,9 +505,11 @@
     ], { duration: dur, easing: ease, fill: 'forwards' });
     rig.animate([{ transform: 'translate(0,0) scale(1)' }, { transform: `translate(${dx}px, ${dy}px) scale(${k})` }], { duration: dur, easing: ease, fill: 'forwards' });
     // light: faces darken as they turn away from the viewer
-    front.animate([{ filter: 'brightness(1)' }, { filter: 'brightness(.45)', offset: 0.5 }, { filter: 'brightness(.25)' }].map((k, n, a) => (closing ? k : a[a.length - 1 - n])).map((k, n) => ({ ...k, offset: n / 2 })), { duration: dur, easing: ease, fill: 'forwards' });
-    back.animate([{ filter: 'brightness(.25)' }, { filter: 'brightness(.5)', offset: 0.5 }, { filter: 'brightness(1)' }].map((k, n, a) => (closing ? k : a[a.length - 1 - n])).map((k, n) => ({ ...k, offset: n / 2 })), { duration: dur, easing: ease, fill: 'forwards' });
-    rig.querySelector('.half').animate([{ filter: 'brightness(1)' }, { filter: 'brightness(.7)', offset: 0.6 }, { filter: 'brightness(1)' }], { duration: dur, easing: ease });
+    const shade = (face, a, b, c) => face.querySelector('.shade').animate(
+      (closing ? [a, b, c] : [c, b, a]).map((o, n) => ({ opacity: o, offset: n / 2 })), { duration: dur, easing: ease, fill: 'forwards' });
+    shade(front, 0, 0.55, 0.75);
+    shade(back, 0.75, 0.5, 0);
+    rig.querySelector('.half .shade').animate([{ opacity: 0 }, { opacity: 0.3, offset: 0.6 }, { opacity: 0 }], { duration: dur, easing: ease });
     await finished(swing);
 
     // 3) switch posture, then the new screen powers on
@@ -914,7 +919,7 @@
       const grid = el('div', 'grid', list);
       for (const d of items) {
         const card = el('div', 'card' + (d.id === curId ? ' cur' : ''), grid);
-        card.innerHTML = `<img class="thumb" src="${ART(thumbFor(d))}" alt=""><span>${escapeHtml(d.name)}</span>`;
+        card.innerHTML = `<img class="thumb" src="${ART(thumbFor(d))}" alt="" loading="lazy" decoding="async"><span>${escapeHtml(d.name)}</span>`;
         if (d.fold) el('span', 'tag', card).textContent = 'fold';
         else if (d.estimate) el('span', 'tag', card).textContent = 'est.';
         if (d.cat === 'custom') {
