@@ -130,6 +130,105 @@
   document.addEventListener('click', (e) => retarget(e.target instanceof Element ? e.target.closest('a[href], area[href]') : null), true);
   document.addEventListener('submit', (e) => retarget(e.target instanceof HTMLFormElement ? e.target : null), true);
 
+  // ---- separate sessions: per-device cookies and storage ----
+  // HTTP cookies are swapped in by the extension (sessions.js); here document.cookie and
+  // Web Storage / IndexedDB / Cache Storage get a per-device namespace.
+  let jarView = null; // non-HttpOnly cookies of this device: [{name, value, domain, hostOnly, path, secure, expires}]
+  if (c.isolate && c.sid) {
+    const sid = c.sid;
+    const seedJar = () => {
+      if (jarView === null) jarView = ((window.__msimJars || {})[sid] || []).slice();
+      return jarView;
+    };
+    const defaultPath = (p) => (p.lastIndexOf('/') <= 0 ? '/' : p.slice(0, p.lastIndexOf('/')));
+    const visible = () => {
+      const host = location.hostname, path = location.pathname || '/', https = location.protocol === 'https:', now = Date.now();
+      return seedJar()
+        .filter((k) => (k.hostOnly ? host === k.domain : host === k.domain || host.endsWith('.' + k.domain)) &&
+          (path === k.path || path.startsWith(k.path.endsWith('/') ? k.path : k.path + '/')) && (!k.secure || https) && (!k.expires || k.expires > now))
+        .map((k) => `${k.name}=${k.value}`).join('; ');
+    };
+    const applyLocal = (str) => {
+      const parts = str.split(';');
+      const eq = parts[0].indexOf('=');
+      if (eq < 0) return;
+      const k = { name: parts[0].slice(0, eq).trim(), value: parts[0].slice(eq + 1).trim(), domain: location.hostname, hostOnly: true,
+        path: defaultPath(location.pathname), secure: false, expires: 0 };
+      for (const a of parts.slice(1)) {
+        const i = a.indexOf('=');
+        const n = (i < 0 ? a : a.slice(0, i)).trim().toLowerCase(), v = i < 0 ? '' : a.slice(i + 1).trim();
+        if (n === 'path' && v.startsWith('/')) k.path = v;
+        else if (n === 'domain' && v) Object.assign(k, { domain: v.replace(/^\./, ''), hostOnly: false });
+        else if (n === 'secure') k.secure = true;
+        else if (n === 'max-age') k.expires = Number(v) <= 0 ? 1 : Date.now() + Number(v) * 1000;
+        else if (n === 'expires' && !Number.isNaN(Date.parse(v))) k.expires = Date.parse(v) <= Date.now() ? 1 : Date.parse(v);
+      }
+      const jar = seedJar();
+      const at = jar.findIndex((x) => x.name === k.name && x.domain === k.domain && x.path === k.path);
+      if (at >= 0) jar.splice(at, 1);
+      if (k.expires !== 1) jar.push(k);
+    };
+    Object.defineProperty(Document.prototype, 'cookie', {
+      configurable: true,
+      get() {
+        return visible();
+      },
+      set(v) {
+        applyLocal(String(v));
+        try {
+          window.parent.postMessage({ msim: true, type: 'setcookie', value: String(v), url: location.href }, '*');
+        } catch {}
+      },
+    });
+    if (window.cookieStore) def(window, 'cookieStore', () => undefined);
+
+    // Web Storage behind a per-device key prefix
+    const prefix = `__msim_${sid}__`;
+    const wrap = (real) => {
+      const keys = () => Object.keys(real).filter((k) => k.startsWith(prefix)).map((k) => k.slice(prefix.length));
+      const api = {
+        getItem: (n) => real.getItem(prefix + n),
+        setItem: (n, v) => real.setItem(prefix + n, String(v)),
+        removeItem: (n) => real.removeItem(prefix + n),
+        clear: () => keys().forEach((k) => real.removeItem(prefix + k)),
+        key: (i) => keys()[i] ?? null,
+      };
+      return new Proxy(real, {
+        get: (t, k) => (k === 'length' ? keys().length : k in api ? api[k] : typeof k === 'symbol' || k in Storage.prototype ? Reflect.get(t, k) : (real.getItem(prefix + k) ?? undefined)),
+        set: (t, k, v) => (real.setItem(prefix + String(k), String(v)), true),
+        deleteProperty: (t, k) => (real.removeItem(prefix + String(k)), true),
+        has: (t, k) => real.getItem(prefix + String(k)) !== null || k in Storage.prototype,
+        ownKeys: () => keys(),
+        getOwnPropertyDescriptor: (t, k) => {
+          const v = real.getItem(prefix + String(k));
+          return v === null ? undefined : { value: v, writable: true, enumerable: true, configurable: true };
+        },
+      });
+    };
+    try {
+      const ls = wrap(window.localStorage), ss = wrap(window.sessionStorage);
+      def(window, 'localStorage', () => ls);
+      def(window, 'sessionStorage', () => ss);
+    } catch {}
+    // IndexedDB and Cache Storage: prefix database / cache names
+    const F = IDBFactory.prototype;
+    const open = F.open, del = F.deleteDatabase, dbs = F.databases;
+    F.open = function (name, ...rest) { return open.call(this, prefix + name, ...rest); };
+    F.deleteDatabase = function (name) { return del.call(this, prefix + name); };
+    if (dbs) F.databases = async function () {
+      return (await dbs.call(this)).filter((d) => d.name.startsWith(prefix)).map((d) => ({ ...d, name: d.name.slice(prefix.length) }));
+    };
+    if (window.CacheStorage) {
+      const C = CacheStorage.prototype;
+      for (const fn of ['open', 'has', 'delete']) {
+        const orig = C[fn];
+        C[fn] = function (name, ...rest) { return orig.call(this, prefix + name, ...rest); };
+      }
+      const keysFn = C.keys;
+      C.keys = async function () { return (await keysFn.call(this)).filter((n) => n.startsWith(prefix)).map((n) => n.slice(prefix.length)); };
+    }
+  }
+
   // ---- language / locale ----
   if (c.lang) {
     const langs = [c.lang, c.lang.split('-')[0]].filter((x, i, a) => a.indexOf(x) === i);
@@ -426,6 +525,7 @@
       applySafeArea();
     }
     if (e.data.type === 'key') typeKey(e.data.key);
+    if (e.data.type === 'jar') jarView = e.data.cookies || [];
     if (e.data.type === 'kbd') {
       kbH = e.data.h || 0;
       if (window.visualViewport) visualViewport.dispatchEvent(new Event('resize'));

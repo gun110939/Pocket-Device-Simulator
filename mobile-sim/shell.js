@@ -124,6 +124,8 @@
     <div class="row2"><span>${T("Browser bars (Safari / Chrome)")}</span><label class="toggle"><input type="checkbox" class="set-bars"><span></span></label></div>
     <div class="row2"><span>${T("Virtual keyboard")}</span><label class="toggle"><input type="checkbox" class="set-kbd"><span></span></label></div>
     <div class="row2"><span>${T("Show safe-area guides")}</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
+    <div class="row2"><span>${T('Separate sessions per device')}</span><label class="toggle"><input type="checkbox" class="set-iso"><span></span></label></div>
+    <div class="note">${T('Each device gets its own cookies and storage, so you can sign in as different users side by side. Chrome shows a "started debugging" bar while this is on.')}</div>
     <div class="set-more"></div>
   </div>
 
@@ -232,11 +234,13 @@
     return { t: 0, r: 0, b: ui().bars ? 0 : 34, l: 0 };
   }
 
+  const newSid = () => Math.random().toString(36).slice(2, 10);
   const cfgFor = (inst) => {
+    if (!inst.sid) inst.sid = newSid();
     const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
       landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false, safe: safeInsets(inst, d),
-      lang: prefs.lang || '', geo: prefs.geo || null };
+      lang: prefs.lang || '', geo: prefs.geo || null, sid: inst.sid, isolate: !!state.isolate };
   };
 
   const PHONE_STYLES = ['island', 'notch', 'punch', 'classic', 'cover'];
@@ -456,6 +460,7 @@
     const tags = [];
     if (state.devices.length > 1 && i === state.primary) tags.push('<span class="badge ua" title="User-Agent header comes from this device">UA</span>');
     if (base.estimate) tags.push('<span class="badge" title="Unreleased or rumoured specs">est.</span>');
+    if (state.isolate) tags.push(`<span class="badge sess" title="${T('Own cookies and storage')}">S${i + 1}</span>`);
     v.caption.innerHTML = `
       <button class="name" title="${T("Change device")}">${escapeHtml(base.name)} ▼</button>
       ${tags.join('')}
@@ -892,7 +897,7 @@
   }
 
   async function addDevice(id) {
-    state.devices.push({ id, landscape: false, folded: true });
+    state.devices.push({ id, landscape: false, folded: true, sid: newSid() });
     const i = state.devices.length - 1;
     views.push(createView(i));
     row.appendChild(views[i].slot);
@@ -903,7 +908,7 @@
   }
 
   async function replaceDevice(i, id) {
-    state.devices[i] = { id, landscape: false, folded: true };
+    state.devices[i] = { id, landscape: false, folded: true, sid: state.devices[i].sid || newSid() };
     const patch = { devices: state.devices };
     const uaChanged = i === state.primary && lookup(id).ua !== state.ua;
     if (i === state.primary) patch.ua = lookup(id).ua;
@@ -1014,6 +1019,10 @@
       const v = views[from];
       if (data.show && ui().keyboard && devOf(state.devices[from]).touch) showKeyboard(v, from, data.kind);
       else if (!data.show) hideKeyboard(v);
+      return;
+    }
+    if (data.type === 'setcookie') {
+      if (state.isolate) send({ type: 'setcookie', sid: state.devices[from].sid, url: data.url, value: data.value });
       return;
     }
     if (data.type === 'viewport') {
@@ -1480,6 +1489,22 @@
     if (!e.target.checked) views.forEach((v) => hideKeyboard(v));
   };
   $('.set-safe').onchange = (e) => setUi({ guides: e.target.checked });
+  $('.set-iso').checked = !!state.isolate;
+  $('.set-iso').onchange = async (e) => {
+    const on = e.target.checked;
+    progress(on ? T('Starting separate sessions…') : T('Back to one shared session…'));
+    const res = await send({ type: 'isolate', on });
+    progress(null);
+    if (!res || res.error) {
+      e.target.checked = false;
+      return toast(T('Could not start separate sessions:') + ' ' + ((res && res.error) || ''), 4000);
+    }
+    state.isolate = on;
+    renameAll();
+    reloadAll();
+    refreshCaptions();
+    toast(on ? T('Each device now has its own session') : T('Devices share one session again'), 2200);
+  };
   $('.shot').onclick = () => {
     updateShotRows();
     togglePop('.shot-pop');
@@ -1511,6 +1536,29 @@
   urlInput.addEventListener('focus', () => urlInput.select());
   $('.exit').onclick = () => send({ type: 'exit' });
   window.addEventListener('resize', scheduleLayout);
+  // messages from the background: cookie updates for a device, debugger bar closed
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg) return;
+      if (msg.type === 'jar') {
+        views.forEach((v, i) => {
+          if (state.devices[i] && state.devices[i].sid === msg.sid) {
+            try {
+              v.iframe.contentWindow.postMessage({ msim: true, type: 'jar', cookies: msg.cookies }, '*');
+            } catch {}
+          }
+        });
+      } else if (msg.type === 'isolation-off' && state.isolate) {
+        state.isolate = false;
+        $('.set-iso').checked = false;
+        save({ isolate: false });
+        renameAll();
+        reloadAll();
+        refreshCaptions();
+        toast(T('Separate sessions turned off'), 2600);
+      }
+    });
+  } catch {}
   root.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closePops();
