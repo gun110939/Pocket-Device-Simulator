@@ -1,0 +1,12 @@
+# raw MaxPlus downloads stay local (large; see art/SOURCES.md and art/maxplus/manifest.jsonl)
+art/maxplus/raw/
+art/maxplus/raw/**/*.log
+# local previews
+art/refs/_*.png
+# OS / tooling
+.DS_Store
+node_modules/
+dist/
+*.zip
+*.crx
+*.pem
