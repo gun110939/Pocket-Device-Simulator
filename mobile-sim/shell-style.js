@@ -134,6 +134,28 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .crease.h { left: 0; right: 0; top: 50%; height: 24px; margin-top: -12px;
   background: linear-gradient(180deg, transparent, rgba(0,0,0,.07) 45%, rgba(255,255,255,.12) 50%, rgba(0,0,0,.07) 55%, transparent); }
 .stage.capturing .screen { border-radius: 0 !important; }
+/* page loading: bar along the top of the screen, card after a short delay */
+.loadbar { position: absolute; left: 0; right: 0; top: 0; height: 4px; z-index: 9; pointer-events: none; overflow: hidden; background: rgba(15,56,15,.25); }
+.loadbar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%;
+  background: repeating-linear-gradient(90deg, #306230 0 6px, #8bac0f 6px 12px); animation: loadrun 1s steps(10) infinite; }
+@keyframes loadrun { from { left: -30%; } to { left: 100%; } }
+.screen.relayout::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; z-index: 9;
+  background: repeating-linear-gradient(90deg, #306230 0 6px, #8bac0f 6px 12px); animation: loadrun .6s steps(10) infinite; }
+.loadcard { position: absolute; left: 50%; top: 50%; z-index: 9; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px 10px 10px; background: #9bbc0f; color: #0f380f; font: 20px/1 "MSIM VT", monospace; pointer-events: none;
+  box-shadow: 0 -4px 0 0 #0f380f, 0 4px 0 0 #0f380f, -4px 0 0 0 #0f380f, 4px 0 0 0 #0f380f, 8px 8px 0 0 rgba(0,0,0,.35);
+  opacity: 0; animation: cardin 0s .7s forwards; }
+.loadcard img { width: 47px; height: 50px; image-rendering: pixelated; animation: bob .6s steps(2) infinite; }
+@keyframes cardin { to { opacity: 1; } }
+.stage.capturing .loadbar, .stage.capturing .loadcard, .stage.chroma .loadbar, .stage.chroma .loadcard { display: none; }
+/* status chip above a device while it folds or rotates */
+.slot { position: relative; }
+.chip { position: absolute; top: -34px; left: 50%; transform: translateX(-50%); z-index: 5; white-space: nowrap;
+  padding: 6px 10px; background: var(--g3); color: var(--g0); font: 9px/1 var(--pixel); text-transform: uppercase;
+  box-shadow: 0 -3px 0 0 var(--g0), 0 3px 0 0 var(--g0), -3px 0 0 0 var(--g0), 3px 0 0 0 var(--g0); }
+.chip::after { content: "..."; display: inline-block; width: 3ch; text-align: left; animation: dots 1s steps(4) infinite; overflow: hidden; vertical-align: bottom; }
+@keyframes dots { from { width: 0; } to { width: 3ch; } }
+
 /* screen power overlay and the fold rig */
 .power { position: absolute; inset: 0; z-index: 8; pointer-events: none;
   background: linear-gradient(115deg, #0b0c0f 0%, #17191e 38%, #0a0b0d 62%, #121418 100%); }

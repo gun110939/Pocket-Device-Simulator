@@ -237,7 +237,11 @@
     v.iframe.name = 'msim:' + encodeURIComponent(JSON.stringify(cfgFor(state.devices[i])));
     v.iframe.src = currentUrl;
     v.screen.appendChild(v.iframe);
-    v.iframe.addEventListener('load', () => onFrameLoad(v));
+    v.iframe.addEventListener('load', () => {
+      setLoading(v, false);
+      onFrameLoad(v);
+    });
+    v.loading = true;
     v.slot.addEventListener('pointerdown', () => setActive(views.indexOf(v)));
     new ResizeObserver(() => scheduleLayout()).observe(v.device);
     return v;
@@ -271,6 +275,7 @@
     // decorations: everything except the screen and the iframe is rebuilt
     for (const n of [...v.body.children]) if (n !== v.screen) n.remove();
     for (const n of [...v.screen.children]) if (n !== v.iframe) n.remove();
+    drawLoading(v);
     for (const n of [...v.device.children]) if (n !== v.body && !n.classList.contains('rig')) n.remove();
 
     // front glass inside the metal band
@@ -409,6 +414,37 @@
     tickClock();
   }
 
+  // ---- loading indicators ----
+  // A thin bar while a device's page loads; a card with the mascot if it takes a while.
+  function drawLoading(v) {
+    v.screen.classList.toggle('loading', !!v.loading);
+    if (!v.loading) return;
+    if (!v.screen.querySelector('.loadbar')) el('div', 'loadbar', v.screen);
+    if (!v.screen.querySelector('.loadcard')) {
+      const c = el('div', 'loadcard', v.screen);
+      c.innerHTML = `<img src="${ART('mascot')}" alt=""><span>Loading…</span>`;
+    }
+  }
+  function setLoading(v, on) {
+    if (!v) return;
+    clearTimeout(v.loadTimer);
+    v.loading = on;
+    if (on) {
+      drawLoading(v);
+      v.loadTimer = setTimeout(() => setLoading(v, false), 30000); // never spin forever
+    } else {
+      v.screen.classList.remove('loading');
+      for (const n of v.screen.querySelectorAll('.loadbar, .loadcard')) n.remove();
+    }
+  }
+  // Status chip above a device while it folds or rotates.
+  function chip(v, text) {
+    let c = v.slot.querySelector('.chip');
+    if (!text) return c && c.remove();
+    if (!c) c = el('div', 'chip', v.slot);
+    c.textContent = text;
+  }
+
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
   }
@@ -426,6 +462,13 @@
   }
 
   const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+  // Give the page a moment to re-layout at its new size, showing the load bar meanwhile.
+  async function settle(v) {
+    v.screen.classList.add('relayout');
+    await nextFrame();
+    await new Promise((r) => setTimeout(r, 260));
+    v.screen.classList.remove('relayout');
+  }
   const finished = (anim) => anim.finished.catch(() => {});
 
   // Screen "power" overlay: the inner screen switches off while folding and back on after.
@@ -442,12 +485,15 @@
     const inst = state.devices[i];
     const deg = inst.landscape ? 90 : -90; // portrait -> landscape turns counter-clockwise
     v.body.style.willChange = 'transform';
+    chip(v, 'Rotating');
     await finished(v.body.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${deg}deg)` }],
       { duration: 480, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'forwards' }));
     v.body.getAnimations().forEach((a) => a.cancel());
     v.body.style.willChange = '';
     reshape(i, { landscape: !inst.landscape });
     layout();
+    await settle(v);
+    chip(v, null);
     v.busy = false;
   }
 
@@ -461,6 +507,7 @@
     if (!base.fold) return;
     v.busy = true;
     const closing = !inst.folded;
+    chip(v, closing ? 'Folding' : 'Unfolding');
     const landscape = !!inst.landscape;
     const U = resolve(base, false);
     const uw = landscape ? U.h : U.w, uh = landscape ? U.w : U.h;
@@ -534,8 +581,10 @@
     rig.remove();
     layout();
     v.body.style.visibility = '';
+    await settle(v);
     await finished(on.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, easing: 'ease-out', fill: 'forwards' }));
     on.remove();
+    chip(v, null);
     v.busy = false;
   }
 
@@ -629,7 +678,7 @@
     if (!scale) {
       const aw = stage.clientWidth - 64 - gap * (views.length - 1);
       // room for the caption plates (they wrap to two lines under narrow devices)
-      const ah = stage.clientHeight - 48 - (views.length > 1 ? 96 : 60);
+      const ah = stage.clientHeight - 48 - 96;
       const sumW = sizes.reduce((a, s) => a + s[0], 0);
       const maxH = Math.max(...sizes.map((s) => s[1]));
       scale = Math.min(1, aw / sumW, ah / maxH);
@@ -683,6 +732,7 @@
       if (j === from || v.lastUrl === url) return;
       v.lastUrl = url;
       v.followUntil = performance.now() + 4000;
+      setLoading(v, true);
       v.iframe.src = url;
     });
   }
@@ -692,6 +742,10 @@
     if (!data || data.msim !== true) return;
     const from = views.findIndex((v) => v.iframe.contentWindow === e.source);
     if (from < 0) return;
+    if (data.type === 'loading') {
+      setLoading(views[from], true);
+      return;
+    }
     if (data.type === 'nav') {
       const v = views[from];
       const followed = performance.now() < v.followUntil;
@@ -721,6 +775,7 @@
   function reloadAll(except = -1) {
     views.forEach((v, j) => {
       if (j === except) return;
+      setLoading(v, true);
       try {
         v.iframe.contentWindow.location.reload();
       } catch {
@@ -748,6 +803,7 @@
     views.forEach((view) => {
       view.lastUrl = target.href;
       view.followUntil = performance.now() + 4000;
+      setLoading(view, true);
       view.iframe.src = target.href;
     });
     setUrl(target.href);
@@ -913,6 +969,7 @@
     const mode = selected($('.rec-opts'));
     const all = $('.rec-all').checked && views.length > 1;
     const v = views[state.active];
+    progress('Waiting for screen-share permission…');
     try {
       recording = await cap.record(all ? row : v.device, {
         mic: $('.rec-mic').checked,
@@ -921,8 +978,10 @@
       });
     } catch (e) {
       recording = null;
+      progress(null);
       return toast('Recording not started: ' + (e && e.message ? e.message : e), 4000);
     }
+    progress(null);
     if (!recording.cropped) toast('Cropping is not supported here, so the whole tab is recorded.', 4000);
     const t0 = Date.now();
     $('.rec-live').classList.add('show');

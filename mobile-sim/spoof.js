@@ -150,6 +150,14 @@
   addEventListener('hashchange', reportUrl);
   addEventListener('DOMContentLoaded', reportUrl);
   addEventListener('load', reportUrl);
+  // Tell the shell when a full-page navigation starts so it can show the load bar
+  // (the Navigation API fires at the start; pagehide is the fallback).
+  if (window.navigation) {
+    navigation.addEventListener('navigate', (e) => {
+      if (!e.destination.sameDocument && !e.downloadRequest) post({ type: 'loading' });
+    });
+  }
+  addEventListener('pagehide', () => post({ type: 'loading' }));
 
   let suppressUntil = 0;
   let scrollQueued = false;
