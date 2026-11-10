@@ -1,4 +1,4 @@
-importScripts('devices.js', 'sessions.js');
+importScripts('devices.js', 'debug.js', 'sessions.js');
 
 // How it works
 // 1. Turning the simulator on for a tab installs tab-scoped network rules, then reloads the tab.
@@ -73,6 +73,7 @@ async function restoreKeptTabs() {
     await setState(tabId, next);
     await installRules(tabId, ruleBase, next.ua || deviceById().ua, next.lang);
     if (next.isolate) await isolate(tabId, next, true).catch(() => setState(tabId, { ...next, isolate: false }));
+    if (next.emu && !Emulation.isDefault(next.emu)) await Emulation.apply(tabId, next.emu).catch(() => {});
     await setBadge(tabId, true);
     await chrome.tabs.reload(tabId, { bypassCache: true }).catch(() => {});
   }
@@ -144,6 +145,14 @@ async function installRules(tabId, base, ua, lang) {
   });
 }
 
+Debug.onLost(async (tabId) => {
+  const state = await getActiveState(tabId);
+  if (state && state.emu && !Emulation.isDefault(state.emu)) {
+    await setState(tabId, { ...state, emu: null });
+    chrome.tabs.sendMessage(tabId, { type: 'emulation-off' }, { frameId: 0 }).catch(() => {});
+  }
+});
+
 // Separate sessions: keep Set-Cookie away from the browser's shared jar for this tab
 // (sessions.js reads it from the raw response first).
 async function setCookieRule(tabId, base, on) {
@@ -200,6 +209,7 @@ async function enable(tab) {
 async function disable(tabId) {
   const state = await getState(tabId);
   await Sessions.stop(tabId, { clear: true });
+  if (state && state.emu) await Emulation.apply(tabId, null).catch(() => {});
   await clearState(tabId);
   await removeRules(state);
   await setBadge(tabId, false);
@@ -290,6 +300,15 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         } catch (e) {
           await setCookieRule(tabId, state.ruleBase, false).catch(() => {});
           await setState(tabId, { ...state, isolate: false });
+          return reply({ error: String((e && e.message) || e) });
+        }
+      }
+      case 'emulate': {
+        try {
+          await Emulation.apply(tabId, msg.emu);
+          await setState(tabId, { ...state, emu: msg.emu });
+          return reply({ ok: true });
+        } catch (e) {
           return reply({ error: String((e && e.message) || e) });
         }
       }

@@ -79,7 +79,7 @@ const Sessions = (() => {
     for (const child of node.childFrames || []) indexTree(t, child, sid);
   }
 
-  const cmd = (tabId, method, params = {}) => chrome.debugger.sendCommand({ tabId }, method, params);
+  const cmd = (tabId, method, params = {}) => Debug.cmd(tabId, method, params);
 
   // Seed for document.cookie: the non-HttpOnly cookies of every device, read by spoof.js at start-up.
   let seedTimer = 0;
@@ -150,11 +150,11 @@ const Sessions = (() => {
     }
   });
 
-  chrome.debugger.onDetach.addListener(async (src) => {
-    if (!tabs.has(src.tabId)) return;
-    tabs.delete(src.tabId);
+  Debug.onLost((tabId) => {
+    if (!tabs.has(tabId)) return;
+    tabs.delete(tabId);
     // The user closed the debugger bar: turn the mode off for this tab.
-    chrome.tabs.sendMessage(src.tabId, { type: 'isolation-off' }, { frameId: 0 }).catch(() => {});
+    chrome.tabs.sendMessage(tabId, { type: 'isolation-off' }, { frameId: 0 }).catch(() => {});
   });
 
   return {
@@ -163,7 +163,7 @@ const Sessions = (() => {
       if (tabs.has(tabId)) return true;
       const { ['jars:' + tabId]: saved } = await chrome.storage.session.get('jars:' + tabId);
       const t = { frames: new Map(), reqs: new Map(), jars: saved || {}, scriptId: null };
-      await chrome.debugger.attach({ tabId }, '1.3');
+      await Debug.acquire(tabId, 'sessions');
       tabs.set(tabId, t);
       await cmd(tabId, 'Page.enable');
       await cmd(tabId, 'Network.enable');
@@ -176,7 +176,11 @@ const Sessions = (() => {
     async stop(tabId, { clear = false } = {}) {
       const t = tabs.get(tabId);
       tabs.delete(tabId);
-      if (t) await chrome.debugger.detach({ tabId }).catch(() => {});
+      if (t) {
+        await cmd(tabId, 'Fetch.disable').catch(() => {});
+        if (t.scriptId) await cmd(tabId, 'Page.removeScriptToEvaluateOnNewDocument', { identifier: t.scriptId }).catch(() => {});
+        await Debug.release(tabId, 'sessions');
+      }
       if (clear) await chrome.storage.session.remove('jars:' + tabId);
     },
     // document.cookie = "..." from a device page

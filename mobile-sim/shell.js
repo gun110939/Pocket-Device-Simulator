@@ -126,6 +126,12 @@
     <div class="row2"><span>${T("Show safe-area guides")}</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
     <div class="row2"><span>${T('Separate sessions per device')}</span><label class="toggle"><input type="checkbox" class="set-iso"><span></span></label></div>
     <div class="note">${T('Each device gets its own cookies and storage, so you can sign in as different users side by side. Chrome shows a "started debugging" bar while this is on.')}</div>
+    <h4 class="sub">${T('Accurate mode')}</h4>
+    <div class="row2"><span>${T('Colour scheme')}</span><select class="emu-scheme"><option value="default">${T('Default')}</option><option value="light">${T('Light')}</option><option value="dark">${T('Dark')}</option></select></div>
+    <div class="row2"><span>${T('Reduced motion')}</span><label class="toggle"><input type="checkbox" class="emu-motion"><span></span></label></div>
+    <div class="row2"><span>${T('Network')}</span><select class="emu-net"><option value="none">${T('No throttling')}</option><option value="fast4g">Fast 4G</option><option value="slow4g">Slow 4G</option><option value="3g">3G</option><option value="offline">${T('Offline')}</option></select></div>
+    <div class="row2"><span>${T('CPU')}</span><select class="emu-cpu"><option value="1">${T('Full speed')}</option><option value="4">${T('4× slower')}</option><option value="6">${T('6× slower')}</option></select></div>
+    <div class="note">${T('Applies to the whole tab through the Chrome debugger, so page CSS sees it too.')}</div>
     <div class="set-more"></div>
   </div>
 
@@ -1489,6 +1495,24 @@
     if (!e.target.checked) views.forEach((v) => hideKeyboard(v));
   };
   $('.set-safe').onchange = (e) => setUi({ guides: e.target.checked });
+  // accurate mode (debugger): media features and throttling
+  const emu = () => (state.emu = state.emu || { scheme: 'default', motion: false, net: 'none', cpu: 1 });
+  $('.emu-scheme').value = emu().scheme;
+  $('.emu-motion').checked = !!emu().motion;
+  $('.emu-net').value = emu().net;
+  $('.emu-cpu').value = String(emu().cpu);
+  const applyEmu = async () => {
+    const next = { scheme: $('.emu-scheme').value, motion: $('.emu-motion').checked, net: $('.emu-net').value, cpu: Number($('.emu-cpu').value) };
+    const res = await send({ type: 'emulate', emu: next });
+    if (!res || res.error) return toast(T('Could not apply:') + ' ' + ((res && res.error) || ''), 4000);
+    const wasOffline = state.emu && state.emu.net === 'offline';
+    state.emu = next;
+    if (wasOffline && next.net !== 'offline') reloadAll(); // pages that failed while offline come back
+    const label = [next.scheme !== 'default' && T(next.scheme === 'dark' ? 'Dark' : 'Light'), next.motion && T('Reduced motion'),
+      next.net !== 'none' && $('.emu-net').selectedOptions[0].textContent, next.cpu > 1 && `CPU ${next.cpu}×`].filter(Boolean).join(' · ');
+    toast(label || T('Accurate mode off'), 1800);
+  };
+  for (const c of ['.emu-scheme', '.emu-motion', '.emu-net', '.emu-cpu']) $(c).onchange = applyEmu;
   $('.set-iso').checked = !!state.isolate;
   $('.set-iso').onchange = async (e) => {
     const on = e.target.checked;
@@ -1548,6 +1572,13 @@
             } catch {}
           }
         });
+      } else if (msg.type === 'emulation-off') {
+        state.emu = null;
+        $('.emu-scheme').value = 'default';
+        $('.emu-motion').checked = false;
+        $('.emu-net').value = 'none';
+        $('.emu-cpu').value = '1';
+        toast(T('Accurate mode off'), 2200);
       } else if (msg.type === 'isolation-off' && state.isolate) {
         state.isolate = false;
         $('.set-iso').checked = false;
