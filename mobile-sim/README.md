@@ -3,6 +3,33 @@
 ส่วนขยาย Chrome สำหรับเปิดหน้าเว็บในกรอบมือถือ จอพับ แท็บเล็ต นาฬิกา แล็ปท็อป หรือทีวี
 พร้อมตัวตนของอุปกรณ์นั้น ทั้ง User-Agent, ขนาดจอ และ touch หน้าตา UI เป็นพิกเซลแบบเครื่องเกมพกพา เลือกได้ทั้งภาษาไทยและอังกฤษ
 
+![ภาพรวม: iPhone 17 Pro, Galaxy Z Fold8 Ultra กางจอ และ iPad mini](../docs/images/overview.png)
+
+## ตัวอย่าง
+
+ภาพทั้งหมดถ่ายด้วยโหมด "ตัวเครื่อง ไม่มีพื้นหลัง" ของ extension เอง บนหน้าเว็บตัวอย่าง [docs/demo](../docs/demo/index.html)
+ซึ่งจัดเลย์เอาต์ตั้งแต่ 1 ถึง 4 คอลัมน์ตามความกว้างจอ ป้ายที่มุมขวาล่างบอก breakpoint ที่ใช้อยู่
+
+| iPhone 17 Pro | Galaxy S25 Ultra | Pixel 10 Pro |
+| :---: | :---: | :---: |
+| <img src="../docs/images/iphone-17-pro.png" width="200" alt="iPhone 17 Pro"> | <img src="../docs/images/galaxy-s25-ultra.png" width="200" alt="Galaxy S25 Ultra"> | <img src="../docs/images/pixel-10-pro.png" width="200" alt="Pixel 10 Pro"> |
+
+| จอพับ | พับ | กาง |
+| :--- | :---: | :---: |
+| **iPhone Duo** | <img src="../docs/images/iphone-duo-folded.png" width="180" alt="iPhone Duo พับ"> | <img src="../docs/images/iphone-duo-unfolded.png" width="340" alt="iPhone Duo กาง"> |
+| **Galaxy Z Fold8** (รุ่นจอกว้าง) | <img src="../docs/images/galaxy-z-fold8-folded.png" width="180" alt="Fold8 พับ"> | <img src="../docs/images/galaxy-z-fold8-unfolded.png" width="340" alt="Fold8 กาง"> |
+| **Galaxy Z Fold8 Ultra** (ตัวเครื่องเหมือน Fold7) | <img src="../docs/images/galaxy-z-fold8-ultra-folded.png" width="150" alt="Fold8 Ultra พับ"> | <img src="../docs/images/galaxy-z-fold8-ultra-unfolded.png" width="300" alt="Fold8 Ultra กาง"> |
+
+<p align="center"><img src="../docs/images/fold-animation.gif" width="380" alt="แอนิเมชันกางจอ Fold8"></p>
+
+| iPad mini | iPad Pro 11" | iPad Pro 13" |
+| :---: | :---: | :---: |
+| <img src="../docs/images/ipad-mini.png" width="220" alt="iPad mini"> | <img src="../docs/images/ipad-pro-11.png" width="230" alt="iPad Pro 11"> | <img src="../docs/images/ipad-pro-13.png" width="250" alt="iPad Pro 13"> |
+
+<p align="center"><img src="../docs/images/macbook-air-13.png" width="640" alt="MacBook Air 13"></p>
+
+สร้างภาพชุดนี้ใหม่ได้ด้วย `node docs/screenshots.mjs`
+
 ## ติดตั้ง
 1. เปิด `chrome://extensions` แล้วเปิด **Developer mode**
 2. กด **Load unpacked** แล้วเลือกโฟลเดอร์ `mobile-sim`

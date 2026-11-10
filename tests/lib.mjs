@@ -49,12 +49,12 @@ export async function evaluate(c, expr) {
 }
 
 let portSeq = 9400;
-export async function launch(startUrl = SITE + '/', { flags = [] } = {}) {
+export async function launch(startUrl = SITE + '/', { flags = [], size = '1300,950' } = {}) {
   const port = portSeq++;
   try { execSync(`lsof -tiTCP:${port} -sTCP:LISTEN | xargs kill`, { stdio: 'ignore' }); } catch {}
   const profile = mkdtempSync(join(tmpdir(), 'pocket-sim-'));
   const proc = spawn(findChrome(), ['--headless=new', `--user-data-dir=${profile}`, `--load-extension=${EXT}`, `--disable-extensions-except=${EXT}`,
-    `--remote-debugging-port=${port}`, '--window-size=1300,950', '--no-first-run', '--lang=en-US', ...flags, startUrl], { stdio: 'ignore' });
+    `--remote-debugging-port=${port}`, `--window-size=${size}`, '--no-first-run', '--lang=en-US', ...flags, startUrl], { stdio: 'ignore' });
   const list = async () => (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
   let sw = null, targets = [];
   for (let i = 0; i < 60 && !sw; i++) {

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pixel Café — demo page for Pocket Device Simulator</title>
+<style>
+  :root { --ink: #1f2a1f; --soft: #5b6b5b; --bg: #f6f3ea; --card: #fff; --accent: #2f7d4a; --accent2: #e7b94a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: var(--ink); background: var(--bg); }
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px;
+    background: rgba(246, 243, 234, .92); backdrop-filter: blur(8px); border-bottom: 1px solid #e3ddcc; }
+  .brand { font-weight: 800; letter-spacing: -.02em; font-size: 20px; }
+  .brand span { color: var(--accent); }
+  nav { display: none; gap: 22px; color: var(--soft); font-weight: 600; font-size: 15px; }
+  .menu { width: 38px; height: 38px; border-radius: 10px; border: 1px solid #d8d1bd; display: grid; place-items: center; font-size: 18px; }
+  .hero { padding: 34px 20px 26px; display: grid; gap: 22px; }
+  .hero h1 { margin: 0; font-size: 34px; line-height: 1.1; letter-spacing: -.03em; }
+  .hero p { margin: 0; color: var(--soft); font-size: 17px; }
+  .cta { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn { padding: 12px 18px; border-radius: 999px; font-weight: 700; background: var(--accent); color: #fff; }
+  .btn.alt { background: transparent; color: var(--ink); border: 1px solid #cfc7b1; }
+  .art { border-radius: 22px; min-height: 180px; background: radial-gradient(circle at 30% 30%, #ffe6a3, transparent 45%),
+      radial-gradient(circle at 75% 65%, #9fd3a8, transparent 50%), linear-gradient(135deg, #2f7d4a, #1f4f33);
+    display: grid; place-items: center; font-size: 76px; box-shadow: 0 18px 40px rgba(31, 79, 51, .25); }
+  .bar { display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 6px; scrollbar-width: none; }
+  .chip { flex: none; padding: 8px 14px; border-radius: 999px; background: #ebe5d4; font-weight: 600; font-size: 14px; }
+  .chip.on { background: var(--ink); color: #fff; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 18px 20px 28px; }
+  .card { background: var(--card); border-radius: 18px; padding: 14px; display: flex; gap: 14px; align-items: center; box-shadow: 0 1px 0 #e6e0cf; }
+  .pic { flex: none; width: 74px; height: 74px; border-radius: 14px; display: grid; place-items: center; font-size: 38px; }
+  .card h3 { margin: 0 0 2px; font-size: 16px; }
+  .card p { margin: 0; color: var(--soft); font-size: 13px; }
+  .price { margin-left: auto; font-weight: 800; }
+  .bp { position: fixed; right: 10px; bottom: 10px; padding: 4px 9px; border-radius: 8px; background: var(--ink); color: #fff; font: 600 12px/1.4 ui-monospace, monospace; }
+  .bp::after { content: "xs · 1 column"; }
+  footer { padding: 26px 20px 60px; color: var(--soft); font-size: 13px; border-top: 1px solid #e3ddcc; }
+
+  @media (min-width: 600px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .bp::after { content: "sm · 2 columns"; }
+  }
+  @media (min-width: 768px) {
+    nav { display: flex; }
+    .menu { display: none; }
+    .hero { grid-template-columns: 1.1fr 1fr; align-items: center; padding: 48px 32px 34px; }
+    .hero h1 { font-size: 44px; }
+    .grid, .bar { padding-left: 32px; padding-right: 32px; }
+    .card { flex-direction: column; align-items: flex-start; }
+    .pic { width: 100%; height: 120px; font-size: 54px; }
+    .price { margin-left: 0; }
+    .bp::after { content: "md · 2 columns + nav"; }
+  }
+  @media (min-width: 1024px) {
+    .grid { grid-template-columns: repeat(3, 1fr); }
+    .hero h1 { font-size: 54px; }
+    .bp::after { content: "lg · 3 columns"; }
+  }
+  @media (min-width: 1280px) {
+    .grid { grid-template-columns: repeat(4, 1fr); }
+    .bp::after { content: "xl · 4 columns"; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Pixel<span>Café</span></div>
+  <nav><span>Menu</span><span>Stores</span><span>Rewards</span><span>Order</span></nav>
+  <div class="menu">☰</div>
+</header>
+<section class="hero">
+  <div>
+    <h1>Fresh coffee, made for every screen.</h1>
+    <p>Order ahead from your phone, your tablet or your laptop. This page reflows from one to four columns.</p>
+    <div class="cta" style="margin-top:18px"><span class="btn">Order now</span><span class="btn alt">See the menu</span></div>
+  </div>
+  <div class="art">☕</div>
+</section>
+<div class="bar"><span class="chip on">All</span><span class="chip">Coffee</span><span class="chip">Tea</span><span class="chip">Bakery</span><span class="chip">Cold drinks</span><span class="chip">Seasonal</span></div>
+<main class="grid">
+  <div class="card"><div class="pic" style="background:#f3e3c7">☕</div><div><h3>Flat white</h3><p>Double ristretto, silky milk</p></div><div class="price">฿85</div></div>
+  <div class="card"><div class="pic" style="background:#dcefdc">🍵</div><div><h3>Matcha latte</h3><p>Ceremonial grade, oat milk</p></div><div class="price">฿95</div></div>
+  <div class="card"><div class="pic" style="background:#fde7cf">🥐</div><div><h3>Butter croissant</h3><p>Baked every morning</p></div><div class="price">฿70</div></div>
+  <div class="card"><div class="pic" style="background:#e5e1f5">🧋</div><div><h3>Thai tea</h3><p>Classic, less sweet</p></div><div class="price">฿65</div></div>
+  <div class="card"><div class="pic" style="background:#fbe0e0">🍰</div><div><h3>Strawberry cake</h3><p>Fresh cream, local berries</p></div><div class="price">฿120</div></div>
+  <div class="card"><div class="pic" style="background:#dff0f5">🧊</div><div><h3>Cold brew</h3><p>Steeped for 18 hours</p></div><div class="price">฿90</div></div>
+  <div class="card"><div class="pic" style="background:#f6efc9">🍋</div><div><h3>Lemon soda</h3><p>Sparkling, house syrup</p></div><div class="price">฿60</div></div>
+  <div class="card"><div class="pic" style="background:#ece3d6">🍪</div><div><h3>Choc chip cookie</h3><p>Sea salt, dark chocolate</p></div><div class="price">฿55</div></div>
+</main>
+<footer>Pixel Café is a made-up shop used to demonstrate Pocket Device Simulator.</footer>
+<div class="bp"></div>
+</body>
+</html>

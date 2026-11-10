@@ -7,6 +7,44 @@ English or Thai.
 
 คู่มือภาษาไทยฉบับเต็ม: [mobile-sim/README.md](mobile-sim/README.md)
 
+![Pocket Device Simulator with an iPhone 17 Pro, an unfolded Galaxy Z Fold8 Ultra and an iPad mini side by side](docs/images/overview.png)
+
+## Screenshots
+
+All shots below were taken with the extension's own **"Device, no background"** screenshot mode
+(transparent PNG) on a demo page, [docs/demo/](docs/demo/index.html), whose layout goes from one
+column to four as the screen gets wider. The badge in the corner shows the active breakpoint.
+
+### Phones
+
+| iPhone 17 Pro | Galaxy S25 Ultra | Pixel 10 Pro |
+| :---: | :---: | :---: |
+| <img src="docs/images/iphone-17-pro.png" width="230" alt="iPhone 17 Pro"> | <img src="docs/images/galaxy-s25-ultra.png" width="230" alt="Galaxy S25 Ultra"> | <img src="docs/images/pixel-10-pro.png" width="230" alt="Pixel 10 Pro"> |
+
+### Foldables
+
+Fold and unfold with a 3D hinge animation; the page is not reloaded.
+
+<p align="center"><img src="docs/images/fold-animation.gif" width="420" alt="Galaxy Z Fold8 unfolding"></p>
+
+| | Folded | Unfolded |
+| :--- | :---: | :---: |
+| **iPhone Duo** | <img src="docs/images/iphone-duo-folded.png" width="200" alt="iPhone Duo folded"> | <img src="docs/images/iphone-duo-unfolded.png" width="380" alt="iPhone Duo unfolded"> |
+| **Galaxy Z Fold8** (wide) | <img src="docs/images/galaxy-z-fold8-folded.png" width="200" alt="Galaxy Z Fold8 folded"> | <img src="docs/images/galaxy-z-fold8-unfolded.png" width="380" alt="Galaxy Z Fold8 unfolded"> |
+| **Galaxy Z Fold8 Ultra** (same body as Fold7) | <img src="docs/images/galaxy-z-fold8-ultra-folded.png" width="170" alt="Galaxy Z Fold8 Ultra folded"> | <img src="docs/images/galaxy-z-fold8-ultra-unfolded.png" width="340" alt="Galaxy Z Fold8 Ultra unfolded"> |
+
+### Tablets
+
+| iPad mini | iPad Pro 11" | iPad Pro 13" |
+| :---: | :---: | :---: |
+| <img src="docs/images/ipad-mini.png" width="250" alt="iPad mini"> | <img src="docs/images/ipad-pro-11.png" width="260" alt="iPad Pro 11 inch"> | <img src="docs/images/ipad-pro-13.png" width="290" alt="iPad Pro 13 inch"> |
+
+### Laptop
+
+<p align="center"><img src="docs/images/macbook-air-13.png" width="720" alt="MacBook Air 13 inch"></p>
+
+Regenerate these images with `node docs/screenshots.mjs`.
+
 ## Install
 
 1. Download or clone this repository (or build a zip with `./scripts/pack.sh` and unzip it).
