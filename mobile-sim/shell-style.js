@@ -277,6 +277,7 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .toast.show img { animation: bob .6s steps(2) infinite; }
 .toast::after { content: "▼"; position: absolute; right: 12px; bottom: 9px; font-size: 14px; animation: blink .8s steps(1) infinite; }
 .toast.show { opacity: 1; }
+.toast.top { top: 8px; bottom: auto; z-index: 30; }
 /* respect the system "reduce motion" setting for decorative loops */
 @media (prefers-reduced-motion: reduce) {
   .logo .mascot, .toast.show img, .slot.active .caption .name::before, .rec-live .dot { animation: none !important; }

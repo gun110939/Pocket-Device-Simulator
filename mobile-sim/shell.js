@@ -116,15 +116,17 @@
   <div class="pop shot-pop" style="right:84px">
     <h4>Screenshot</h4>
     <div class="opts shot-opts">
-      <div class="opt sel" data-mode="frame">${I('phone', 3)}Device with frame</div>
+      <div class="opt sel" data-mode="frame">${I('phone', 3)}Device, no background</div>
+      <div class="opt" data-mode="background">${I('image', 3)}Device on a colour</div>
       <div class="opt" data-mode="screen">${I('screen', 3)}Screen only</div>
       <div class="opt" data-mode="full">${I('down', 3)}Full page</div>
-      <div class="opt" data-mode="background">${I('image', 3)}On a background</div>
     </div>
     <div class="row2 bg-row"><span>Background colour</span><input type="color" class="bg-color" value="#9bbc0f"></div>
-    <div class="row2 all-row"><span>All visible devices</span><label class="toggle"><input type="checkbox" class="shot-all"><span></span></label></div>
+    <div class="row2 round-row"><span>Rounded corners, transparent</span><label class="toggle"><input type="checkbox" class="shot-round"><span></span></label></div>
+    <div class="row2 all-row"><span>Devices</span><select class="shot-scope">
+      <option value="active">Active device</option><option value="combined">All in one image</option><option value="each">Each device (.zip)</option></select></div>
     <button class="btn primary go shot-go">${I('camera')}Take screenshot</button>
-    <div class="note">Captures the active device (highlighted name). Higher zoom gives a sharper image.</div>
+    <div class="note">"No background" saves a transparent PNG. Higher zoom gives a sharper image.</div>
   </div>
 
   <div class="pop rec-pop" style="right:44px">
@@ -156,12 +158,25 @@
 
   const toast = (text, ms = 2000, pose = 'mascot') => {
     const t = $('.toast');
+    if (ms < 60000) t.classList.remove('top');
     t.querySelector('span').textContent = text;
     t.querySelector('img').src = ART(pose);
     t.classList.add('show');
     clearTimeout(toast.timer);
     toast.timer = setTimeout(() => t.classList.remove('show'), ms);
   };
+
+  // Persistent toast for long operations; progress(null) hides it.
+  // It sits over the toolbar so it never ends up inside a capture.
+  function progress(text) {
+    const t = $('.toast');
+    if (text === null) {
+      t.classList.remove('show', 'top');
+      return;
+    }
+    t.classList.add('top');
+    toast(text, 60000, 'mascot');
+  }
 
   // ---- state ----
   // Older state shape had a single deviceId.
@@ -777,14 +792,18 @@
   function updateShotRows() {
     const mode = selected($('.shot-opts'));
     $('.shot-pop .bg-row').style.display = mode === 'background' ? '' : 'none';
-    $('.shot-pop .all-row').style.display = (mode === 'frame' || mode === 'background') && views.length > 1 ? '' : 'none';
+    $('.shot-pop .round-row').style.display = mode === 'screen' ? '' : 'none';
+    $('.shot-pop .all-row').style.display = views.length > 1 ? '' : 'none';
+    const combined = $('.shot-scope option[value=combined]');
+    combined.disabled = !(mode === 'frame' || mode === 'background');
+    if (combined.disabled && $('.shot-scope').value === 'combined') $('.shot-scope').value = 'active';
     $('.rec-pop .all-row').style.display = views.length > 1 ? '' : 'none';
   }
 
   // ---- screenshots ----
   async function withCaptureView(fn) {
     closePops();
-    $('.toast').classList.remove('show');
+    if (!$('.toast').classList.contains('top')) $('.toast').classList.remove('show');
     const saved = state.zoom;
     const targetsVisible = () => {
       const r = row.getBoundingClientRect();
@@ -808,47 +827,79 @@
     }
   }
 
+  const stampNow = () => new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
+  const shotName = (i, mode) => {
+    const inst = state.devices[i];
+    return `${inst.id}${inst.landscape ? '-landscape' : ''}${lookup(inst.id).fold ? (inst.folded ? '-folded' : '-unfolded') : ''}-${mode}`;
+  };
+
+  // One capture of view i (or of the whole row) in the given mode; returns a canvas.
+  async function captureOne(mode, i, whole) {
+    const v = views[i];
+    if (mode === 'full') {
+      stage.classList.add('capturing');
+      await cap.frames();
+      try {
+        return await cap.fullPage(v.iframe, (p) => progress(`Full page ${Math.round(p * 100)}%`));
+      } finally {
+        stage.classList.remove('capturing');
+      }
+    }
+    if (mode === 'screen') {
+      stage.classList.add('capturing');
+      await cap.frames();
+      const { img, k } = await cap.grabTab();
+      stage.classList.remove('capturing');
+      let c = cap.crop(img, k, v.screen.getBoundingClientRect());
+      if ($('.shot-round').checked) {
+        const d = resolve(lookup(state.devices[i].id), state.devices[i].folded);
+        c = cap.roundCorners(c, (d.radius || 0) * Number(stage.dataset.scale || 1) * k);
+      }
+      return c;
+    }
+    // frame / background: paint the stage green and key it out for a transparent PNG
+    stage.classList.add('chroma');
+    for (const x of views) x.caption.style.visibility = 'hidden';
+    await cap.frames();
+    const r = (whole ? row : v.device).getBoundingClientRect();
+    const m = 6; // include the drawn rim and side buttons
+    const rect = { left: r.left - m, top: r.top - m, width: r.width + 2 * m, height: r.height + 2 * m };
+    try {
+      const { img, k } = await cap.grabTab();
+      let c = cap.keyOutGreen(cap.crop(img, k, rect));
+      if (mode === 'background') c = cap.withBackground(c, $('.bg-color').value, k);
+      return c;
+    } finally {
+      stage.classList.remove('chroma');
+      for (const x of views) x.caption.style.visibility = '';
+    }
+  }
+
   async function screenshot() {
     const mode = selected($('.shot-opts'));
-    const all = $('.shot-all').checked && views.length > 1;
-    const v = views[state.active];
-    const inst = state.devices[state.active];
-    const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
-    const name = (all ? 'devices' : `${inst.id}${inst.landscape ? '-landscape' : ''}${lookup(inst.id).fold ? (inst.folded ? '-folded' : '-unfolded') : ''}`) + `-${mode}-${stamp}.png`;
+    const scope = views.length > 1 ? $('.shot-scope').value : 'active';
+    const stamp = stampNow();
     try {
       await withCaptureView(async () => {
-        if (mode === 'full') {
-          toast('Capturing full page…', 60000);
-          stage.classList.add('capturing');
-          await cap.frames();
-          $('.toast').classList.remove('show');
-          const canvas = await cap.fullPage(v.iframe);
-          await cap.save(canvas, name);
-          return;
+        if (scope === 'combined') {
+          await cap.save(await captureOne(mode, state.active, true), `devices-${mode}-${stamp}.png`);
+        } else if (scope === 'each') {
+          const files = [];
+          for (let i = 0; i < views.length; i++) {
+            progress(`Device ${i + 1} of ${views.length}…`);
+            const c = await captureOne(mode, i, false);
+            files.push({ name: `${String(i + 1).padStart(2, '0')}-${shotName(i, mode)}.png`, blob: await c.convertToBlob({ type: 'image/png' }) });
+            if (i < views.length - 1) await cap.sleep(550); // captureVisibleTab allows about 2 calls per second
+          }
+          cap.download(await cap.zip(files), `devices-${mode}-${stamp}.zip`);
+        } else {
+          await cap.save(await captureOne(mode, state.active, false), `${shotName(state.active, mode)}-${stamp}.png`);
         }
-        if (mode === 'screen') {
-          stage.classList.add('capturing');
-          await cap.frames();
-          const { img, k } = await cap.grabTab();
-          await cap.save(cap.crop(img, k, v.screen.getBoundingClientRect()), name);
-          return;
-        }
-        // frame / background: paint the stage green and key it out for a transparent PNG
-        stage.classList.add('chroma');
-        for (const x of views) x.caption.style.visibility = 'hidden';
-        await cap.frames();
-        const target = all ? row : v.device;
-        const r = target.getBoundingClientRect();
-        const m = 6; // include the drawn rim
-        const rect = { left: r.left - m, top: r.top - m, width: r.width + 2 * m, height: r.height + 2 * m };
-        const { img, k } = await cap.grabTab();
-        for (const x of views) x.caption.style.visibility = '';
-        let canvas = cap.keyOutGreen(cap.crop(img, k, rect));
-        if (mode === 'background') canvas = cap.withBackground(canvas, $('.bg-color').value, k);
-        await cap.save(canvas, name);
       });
-      toast('Screenshot saved!', 2400, 'mascot-camera');
+      progress(null);
+      toast(scope === 'each' ? `Saved ${views.length} screenshots (.zip)` : 'Screenshot saved!', 2400, 'mascot-camera');
     } catch (e) {
+      progress(null);
       for (const x of views) x.caption.style.visibility = '';
       toast('Screenshot failed: ' + (e && e.message ? e.message : e), 4000);
     }
