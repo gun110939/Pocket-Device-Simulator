@@ -70,3 +70,7 @@ covers them; one User-Agent header applies per tab (the device marked **UA**).
 
 Pixel fonts: Press Start 2P and VT323 (SIL Open Font License, see `mobile-sim/fonts/`).
 Pixel art generated for this project (see `art/SOURCES.md`).
+
+## License
+
+[MIT](LICENSE). The bundled fonts keep their own SIL Open Font License.
