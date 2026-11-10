@@ -22,7 +22,7 @@
     staleShown = true;
     const o = document.createElement('div');
     o.className = 'stale';
-    o.innerHTML = '<div class="box"><h4>Pocket Sim was updated</h4><p>This tab still runs the old version. Reload the page to continue.</p><button class="btn primary">Reload page</button></div>';
+    o.innerHTML = `<div class="box"><h4>${T("Pocket Sim was updated")}</h4><p>${T("This tab still runs the old version. Reload the page to continue.")}</p><button class="btn primary">${T("Reload page")}</button></div>`;
     o.querySelector('button').onclick = () => location.reload();
     shellRoot.querySelector('.app').appendChild(o);
   }
@@ -47,6 +47,10 @@
   const lookup = (id) => allDevices().find((d) => d.id === id) || BUILTIN.find((d) => d.id === self.MSIM_DEFAULT_DEVICE);
 
   let currentUrl = location.href;
+  const prefs = await chrome.storage.local.get(['uiLang', 'lang', 'geo', 'deviceSets']);
+  // interface language: the saved choice, otherwise Thai when the browser is Thai
+  const uiLang = prefs.uiLang || ((navigator.language || '').toLowerCase().startsWith('th') ? 'th' : 'en');
+  const T = (text) => (uiLang === 'th' && self.MSIM_TH && self.MSIM_TH[text]) || text;
 
   // ---- replace the page ----
   window.stop();
@@ -83,77 +87,77 @@
   };
 
   root.innerHTML = `<style>${self.MSIM_CSS}</style>
-<div class="app">
+<div class="app ${uiLang === 'th' ? 'th' : ''}">
   <div class="scene" style="background-image:url('${ART('scene')}')"></div>
   <div class="bar">
     <div class="logo"><img class="mascot" src="${ART('mascot')}" alt="">POCKET&nbsp;SIM</div>
     <div class="grp">
-      <button class="btn add" title="Add another device to this tab">${I('plus')}Device</button>
-      <button class="btn sync" title="Sync options">${I('sync')}Sync</button>
-      <button class="btn settings" title="Settings">${I('gear')}</button>
-      <select class="zoom" title="Zoom">
-        <option value="fit">Fit</option><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.33">33%</option>
+      <button class="btn add" title="${T("Add another device to this tab")}">${I('plus')}${T("Device")}</button>
+      <button class="btn sync" title="${T("Sync options")}">${I('sync')}${T("Sync")}</button>
+      <button class="btn settings" title="${T("Settings")}">${I('gear')}</button>
+      <select class="zoom" title="${T("Zoom")}">
+        <option value="fit">${T("Fit")}</option><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.33">33%</option>
       </select>
     </div>
     <span class="sep"></span>
-    <button class="btn back" title="Back">${I('back')}</button>
-    <button class="btn reload" title="Reload all devices">${I('reload')}</button>
+    <button class="btn back" title="${T("Back")}">${I('back')}</button>
+    <button class="btn reload" title="${T("Reload all devices")}">${I('reload')}</button>
     <input class="url" spellcheck="false" />
     <span class="sep"></span>
-    <span class="rec-live"><span class="dot"></span>REC <span class="rec-time">0:00</span><button class="btn rec-stop">${I('stop')}Stop</button></span>
-    <button class="btn shot" title="Screenshot">${I('camera')}</button>
-    <button class="btn rec" title="Record video">${I('rec')}</button>
-    <button class="btn danger exit" title="Exit simulator">${I('close')}</button>
+    <span class="rec-live"><span class="dot"></span>REC <span class="rec-time">0:00</span><button class="btn rec-stop">${I('stop')}${T("Stop")}</button></span>
+    <button class="btn shot" title="${T("Screenshot")}">${I('camera')}</button>
+    <button class="btn rec" title="${T("Record video")}">${I('rec')}</button>
+    <button class="btn danger exit" title="${T("Exit simulator")}">${I('close')}</button>
   </div>
   <div class="stage"><div class="row"></div></div>
 
   <div class="pop sync-pop" style="left:120px">
-    <h4>Sync between devices</h4>
-    <div class="row2"><span>Scroll position</span><label class="toggle"><input type="checkbox" class="sync-scroll"><span></span></label></div>
-    <div class="row2"><span>Navigation (links, back)</span><label class="toggle"><input type="checkbox" class="sync-nav"><span></span></label></div>
-    <div class="note">The User-Agent header is per tab, so it follows the device marked UA. Each device still reports its own identity to page scripts.</div>
+    <h4>${T("Sync between devices")}</h4>
+    <div class="row2"><span>${T("Scroll position")}</span><label class="toggle"><input type="checkbox" class="sync-scroll"><span></span></label></div>
+    <div class="row2"><span>${T("Navigation (links, back)")}</span><label class="toggle"><input type="checkbox" class="sync-nav"><span></span></label></div>
+    <div class="note">${T("The User-Agent header is per tab, so it follows the device marked UA. Each device still reports its own identity to page scripts.")}</div>
   </div>
 
   <div class="pop set-pop" style="left:200px">
-    <h4>Settings</h4>
-    <div class="row2"><span>Touch: mouse acts like a finger</span><label class="toggle"><input type="checkbox" class="set-touch"><span></span></label></div>
-    <div class="row2"><span>Browser bars (Safari / Chrome)</span><label class="toggle"><input type="checkbox" class="set-bars"><span></span></label></div>
-    <div class="row2"><span>Virtual keyboard</span><label class="toggle"><input type="checkbox" class="set-kbd"><span></span></label></div>
-    <div class="row2"><span>Show safe-area guides</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
+    <h4>${T("Settings")}</h4>
+    <div class="row2"><span>${T("Touch: mouse acts like a finger")}</span><label class="toggle"><input type="checkbox" class="set-touch"><span></span></label></div>
+    <div class="row2"><span>${T("Browser bars (Safari / Chrome)")}</span><label class="toggle"><input type="checkbox" class="set-bars"><span></span></label></div>
+    <div class="row2"><span>${T("Virtual keyboard")}</span><label class="toggle"><input type="checkbox" class="set-kbd"><span></span></label></div>
+    <div class="row2"><span>${T("Show safe-area guides")}</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
     <div class="set-more"></div>
   </div>
 
   <div class="pop shot-pop" style="right:84px">
-    <h4>Screenshot</h4>
+    <h4>${T("Screenshot")}</h4>
     <div class="opts shot-opts">
-      <div class="opt sel" data-mode="frame">${I('phone', 3)}Device, no background</div>
-      <div class="opt" data-mode="background">${I('image', 3)}Device on a colour</div>
-      <div class="opt" data-mode="screen">${I('screen', 3)}Screen only</div>
-      <div class="opt" data-mode="full">${I('down', 3)}Full page</div>
+      <div class="opt sel" data-mode="frame">${I('phone', 3)}${T("Device, no background")}</div>
+      <div class="opt" data-mode="background">${I('image', 3)}${T("Device on a colour")}</div>
+      <div class="opt" data-mode="screen">${I('screen', 3)}${T("Screen only")}</div>
+      <div class="opt" data-mode="full">${I('down', 3)}${T("Full page")}</div>
     </div>
-    <div class="row2 bg-row"><span>Background colour</span><input type="color" class="bg-color" value="#9bbc0f"></div>
-    <div class="row2 round-row"><span>Rounded corners, transparent</span><label class="toggle"><input type="checkbox" class="shot-round"><span></span></label></div>
-    <div class="row2 all-row"><span>Devices</span><select class="shot-scope">
-      <option value="active">Active device</option><option value="combined">All in one image</option><option value="each">Each device (.zip)</option></select></div>
-    <button class="btn primary go shot-go">${I('camera')}Take screenshot</button>
-    <div class="note">"No background" saves a transparent PNG. Higher zoom gives a sharper image.</div>
+    <div class="row2 bg-row"><span>${T("Background colour")}</span><input type="color" class="bg-color" value="#9bbc0f"></div>
+    <div class="row2 round-row"><span>${T("Rounded corners, transparent")}</span><label class="toggle"><input type="checkbox" class="shot-round"><span></span></label></div>
+    <div class="row2 all-row"><span>${T("Devices")}</span><select class="shot-scope">
+      <option value="active">${T("Active device")}</option><option value="combined">${T("All in one image")}</option><option value="each">${T("Each device (.zip)")}</option></select></div>
+    <button class="btn primary go shot-go">${I('camera')}${T("Take screenshot")}</button>
+    <div class="note">${T("\"No background\" saves a transparent PNG. Higher zoom gives a sharper image.")}</div>
   </div>
 
   <div class="pop rec-pop" style="right:44px">
-    <h4>Record video</h4>
+    <h4>${T("Record video")}</h4>
     <div class="opts rec-opts">
-      <div class="opt sel" data-mode="device">${I('phone', 3)}Device only</div>
-      <div class="opt" data-mode="cam">${I('face', 3)}Device + webcam</div>
+      <div class="opt sel" data-mode="device">${I('phone', 3)}${T("Device only")}</div>
+      <div class="opt" data-mode="cam">${I('face', 3)}${T("Device + webcam")}</div>
     </div>
-    <div class="row2"><span>Microphone</span><label class="toggle"><input type="checkbox" class="rec-mic"><span></span></label></div>
-    <div class="row2"><span>Quality</span><select class="rec-q"><option value="3000000">Standard</option><option value="8000000" selected>High</option><option value="16000000">Max</option></select></div>
-    <div class="row2 all-row"><span>All visible devices</span><label class="toggle"><input type="checkbox" class="rec-all"><span></span></label></div>
-    <button class="btn primary go rec-go">${I('rec')}Start recording</button>
-    <div class="note">Chrome asks you to share this tab; choose it and press Share. Tick "Also share tab audio" to include page sound.</div>
+    <div class="row2"><span>${T("Microphone")}</span><label class="toggle"><input type="checkbox" class="rec-mic"><span></span></label></div>
+    <div class="row2"><span>${T("Quality")}</span><select class="rec-q"><option value="3000000">${T("Standard")}</option><option value="8000000" selected>${T("High")}</option><option value="16000000">${T("Max")}</option></select></div>
+    <div class="row2 all-row"><span>${T("All visible devices")}</span><label class="toggle"><input type="checkbox" class="rec-all"><span></span></label></div>
+    <button class="btn primary go rec-go">${I('rec')}${T("Start recording")}</button>
+    <div class="note">${T("Chrome asks you to share this tab; choose it and press Share. Tick \"Also share tab audio\" to include page sound.")}</div>
   </div>
 
   <div class="panel">
-    <div class="head"><input class="search" placeholder="Search devices…"><button class="btn close-panel">${I('close')}</button></div>
+    <div class="head"><input class="search" placeholder="${T("Search devices…")}"><button class="btn close-panel">${I('close')}</button></div>
     <div class="mode"></div>
     <div class="list"></div>
   </div>
@@ -231,7 +235,8 @@
   const cfgFor = (inst) => {
     const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
-      landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false, safe: safeInsets(inst, d) };
+      landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false, safe: safeInsets(inst, d),
+      lang: prefs.lang || '', geo: prefs.geo || null };
   };
 
   const PHONE_STYLES = ['island', 'notch', 'punch', 'classic', 'cover'];
@@ -452,18 +457,18 @@
     if (state.devices.length > 1 && i === state.primary) tags.push('<span class="badge ua" title="User-Agent header comes from this device">UA</span>');
     if (base.estimate) tags.push('<span class="badge" title="Unreleased or rumoured specs">est.</span>');
     v.caption.innerHTML = `
-      <button class="name" title="Change device">${escapeHtml(base.name)} ▼</button>
+      <button class="name" title="${T("Change device")}">${escapeHtml(base.name)} ▼</button>
       ${tags.join('')}
       ${base.responsive ? `<span class="rsize"><input class="rw" type="number" min="200" max="3840" value="${w}">×<input class="rh" type="number" min="200" max="3840" value="${h}"></span>
-        <select class="rpreset" title="Common sizes"><option value="">Sizes</option>${RESP_SIZES.map(([a, b]) => `<option value="${a}x${b}">${a}×${b}</option>`).join('')}</select>
-        <select class="rdpr" title="Pixel ratio">${[1, 2, 3].map((x) => `<option value="${x}" ${x === d.dpr ? 'selected' : ''}>@${x}x</option>`).join('')}</select>
-        <button class="btn rmode ${inst.desktop ? 'on' : ''}" title="Identity: mobile (touch, mobile UA) or desktop">${inst.desktop ? 'Desktop' : 'Mobile'}</button>`
+        <select class="rpreset" title="Common sizes"><option value="">${T("Sizes")}</option>${RESP_SIZES.map(([a, b]) => `<option value="${a}x${b}">${a}×${b}</option>`).join('')}</select>
+        <select class="rdpr" title="${T("Pixel ratio")}">${[1, 2, 3].map((x) => `<option value="${x}" ${x === d.dpr ? 'selected' : ''}>@${x}x</option>`).join('')}</select>
+        <button class="btn rmode ${inst.desktop ? 'on' : ''}" title="Identity: mobile (touch, mobile UA) or desktop">${T(inst.desktop ? 'Desktop' : 'Mobile')}</button>`
       : `<span class="meta">${w}×${h - barH} @${d.dpr}x</span>`}
       <button class="btn fin" title="Finish: ${escapeHtml(finish.name)} (click for the next colour)"><i style="background:${finish.metal}"></i></button>
-      <button class="btn rot" title="Rotate">${I('rotate')}</button>
-      ${base.fold ? `<button class="btn fold ${inst.folded ? '' : 'on'}" title="Fold / unfold">${I('fold')}${inst.folded ? 'Unfold' : 'Fold'}</button>` : ''}
-      ${state.devices.length > 1 && i !== state.primary ? '<button class="btn mkua" title="Use this device for the User-Agent header">UA</button>' : ''}
-      ${state.devices.length > 1 ? `<button class="btn rm" title="Remove from tab">${I('close')}</button>` : ''}`;
+      <button class="btn rot" title="${T("Rotate")}">${I('rotate')}</button>
+      ${base.fold ? `<button class="btn fold ${inst.folded ? '' : 'on'}" title="${T("Fold / unfold")}">${I('fold')}${T(inst.folded ? 'Unfold' : 'Fold')}</button>` : ''}
+      ${state.devices.length > 1 && i !== state.primary ? '<button class="btn mkua" title="${T("Use this device for the User-Agent header")}">UA</button>' : ''}
+      ${state.devices.length > 1 ? `<button class="btn rm" title="${T("Remove from tab")}">${I('close')}</button>` : ''}`;
     v.caption.querySelector('.name').onclick = () => openPicker('replace', i);
     v.caption.querySelector('.rot').onclick = () => rotateDevice(i);
     v.caption.querySelector('.fin').onclick = () => {
@@ -493,7 +498,7 @@
     if (!v.screen.querySelector('.loadbar')) el('div', 'loadbar', v.screen);
     if (!v.screen.querySelector('.loadcard')) {
       const c = el('div', 'loadcard', v.screen);
-      c.innerHTML = `<img src="${ART('mascot')}" alt=""><span>Loading…</span>`;
+      c.innerHTML = `<img src="${ART('mascot')}" alt=""><span>${T("Loading…")}</span>`;
     }
   }
   function setLoading(v, on) {
@@ -737,7 +742,7 @@
     const inst = state.devices[i];
     const deg = inst.landscape ? 90 : -90; // portrait -> landscape turns counter-clockwise
     v.body.style.willChange = 'transform';
-    chip(v, 'Rotating');
+    chip(v, T('Rotating'));
     hideKeyboard(v, true);
     await finished(v.body.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${deg}deg)` }],
       { duration: 480, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'forwards' }));
@@ -760,7 +765,7 @@
     if (!base.fold) return;
     v.busy = true;
     const closing = !inst.folded;
-    chip(v, closing ? 'Folding' : 'Unfolding');
+    chip(v, T(closing ? 'Folding' : 'Unfolding'));
     const landscape = !!inst.landscape;
     const U = resolve(base, false);
     const uw = landscape ? U.h : U.w, uh = landscape ? U.w : U.h;
@@ -1068,7 +1073,7 @@
     try {
       target = new URL(v);
     } catch {
-      return toast('Invalid URL');
+      return toast(T('Invalid URL'));
     }
     if (target.origin !== location.origin) {
       location.href = target.href; // the shell re-forms on the new origin
@@ -1170,7 +1175,7 @@
       stage.classList.add('capturing');
       await cap.frames();
       try {
-        return await cap.fullPage(v.iframe, (p) => progress(`Full page ${Math.round(p * 100)}%`));
+        return await cap.fullPage(v.iframe, (p) => progress(`${T('Full page')} ${Math.round(p * 100)}%`));
       } finally {
         stage.classList.remove('capturing');
       }
@@ -1227,11 +1232,11 @@
         }
       });
       progress(null);
-      toast(scope === 'each' ? `Saved ${views.length} screenshots (.zip)` : 'Screenshot saved!', 2400, 'mascot-camera');
+      toast(scope === 'each' ? (uiLang === 'th' ? `บันทึก ${views.length} ภาพแล้ว (.zip)` : `Saved ${views.length} screenshots (.zip)`) : T('Screenshot saved!'), 2400, 'mascot-camera');
     } catch (e) {
       progress(null);
       for (const x of views) x.caption.style.visibility = '';
-      toast('Screenshot failed: ' + (e && e.message ? e.message : e), 4000);
+      toast(T('Screenshot failed:') + ' ' + (e && e.message ? e.message : e), 4000);
     }
   }
 
@@ -1243,7 +1248,7 @@
     const mode = selected($('.rec-opts'));
     const all = $('.rec-all').checked && views.length > 1;
     const v = views[state.active];
-    progress('Waiting for screen-share permission…');
+    progress(T('Waiting for screen-share permission…'));
     try {
       recording = await cap.record(all ? row : v.device, {
         mic: $('.rec-mic').checked,
@@ -1253,7 +1258,7 @@
     } catch (e) {
       recording = null;
       progress(null);
-      return toast('Recording not started: ' + (e && e.message ? e.message : e), 4000);
+      return toast(T('Recording not started:') + ' ' + (e && e.message ? e.message : e), 4000);
     }
     progress(null);
     if (!recording.cropped) toast('Cropping is not supported here, so the whole tab is recorded.', 4000);
@@ -1274,7 +1279,7 @@
       $('.rec').style.display = '';
       const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19);
       cap.download(blob, `${all ? 'devices' : inst.id}-recording-${stamp}.${ext}`);
-      toast('Recording saved!', 2400, 'mascot-rec');
+      toast(T('Recording saved!'), 2400, 'mascot-rec');
       recording = null;
     });
   }
@@ -1284,7 +1289,7 @@
   function openPicker(kind, index = 0) {
     closePops();
     pickerMode = { kind, index };
-    $('.panel .mode').textContent = kind === 'add' ? 'Add a device next to the others' : `Replace: ${lookup(state.devices[index].id).name}`;
+    $('.panel .mode').textContent = kind === 'add' ? T('Add a device next to the others') : `${T('Replace:')} ${lookup(state.devices[index].id).name}`;
     $('.search').value = '';
     renderPicker();
     $('.panel').classList.add('show');
@@ -1299,7 +1304,7 @@
     for (const c of CAT) {
       const items = allDevices().filter((d) => d.cat === c.id && (!q || d.name.toLowerCase().includes(q)));
       if (!items.length && (c.id !== 'custom' || q)) continue;
-      el('h3', '', list).textContent = c.label;
+      el('h3', '', list).textContent = T(c.label);
       const grid = el('div', 'grid', list);
       for (const d of items) {
         const card = el('div', 'card' + (d.id === curId ? ' cur' : ''), grid);
@@ -1312,7 +1317,7 @@
           del.title = 'Delete custom device';
           del.onclick = async (e) => {
             e.stopPropagation();
-            if (state.devices.some((x) => x.id === d.id)) return toast('Remove it from the tab first');
+            if (state.devices.some((x) => x.id === d.id)) return toast(T('Remove it from the tab first'));
             customs = customs.filter((x) => x.id !== d.id);
             await chrome.storage.local.set({ customDevices: customs });
             renderPicker();
@@ -1326,26 +1331,26 @@
         add.title = 'New custom device';
         const form = el('div', 'form', list);
         form.innerHTML = `
-          <label class="wide">Name<input class="f-name" placeholder="My device"></label>
-          <label>Width (CSS px)<input class="f-w" type="number" min="100" max="4000" value="390"></label>
-          <label>Height (CSS px)<input class="f-h" type="number" min="100" max="4000" value="844"></label>
-          <label>Pixel ratio<input class="f-dpr" type="number" min="1" max="5" step="0.125" value="3"></label>
-          <label>Behaves like<select class="f-preset">${Object.entries(self.MSIM_PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('')}</select></label>
-          <label class="wide">User-Agent (optional, overrides the preset)<input class="f-ua" placeholder="leave empty to use the preset"></label>
-          <div class="actions"><button class="btn f-cancel">Cancel</button><button class="btn primary f-save">Save</button></div>`;
+          <label class="wide">${T("Name")}<input class="f-name" placeholder="My device"></label>
+          <label>${T("Width (CSS px)")}<input class="f-w" type="number" min="100" max="4000" value="390"></label>
+          <label>${T("Height (CSS px)")}<input class="f-h" type="number" min="100" max="4000" value="844"></label>
+          <label>${T("Pixel ratio")}<input class="f-dpr" type="number" min="1" max="5" step="0.125" value="3"></label>
+          <label>${T("Behaves like")}<select class="f-preset">${Object.entries(self.MSIM_PRESETS).map(([k, p]) => `<option value="${k}">${p.label}</option>`).join('')}</select></label>
+          <label class="wide">${T("User-Agent (optional, overrides the preset)")}<input class="f-ua" placeholder="leave empty to use the preset"></label>
+          <div class="actions"><button class="btn f-cancel">${T("Cancel")}</button><button class="btn primary f-save">${T("Save")}</button></div>`;
         add.onclick = () => form.classList.add('show');
         form.querySelector('.f-cancel').onclick = () => form.classList.remove('show');
         form.querySelector('.f-save').onclick = async () => {
           const val = (s) => form.querySelector(s).value.trim();
           const w = Math.round(Number(val('.f-w'))), h = Math.round(Number(val('.f-h'))), dpr = Number(val('.f-dpr'));
-          if (!(w >= 100 && w <= 4000 && h >= 100 && h <= 4000 && dpr >= 1 && dpr <= 5)) return toast('Check the size and pixel ratio');
+          if (!(w >= 100 && w <= 4000 && h >= 100 && h <= 4000 && dpr >= 1 && dpr <= 5)) return toast(T('Check the size and pixel ratio'));
           const preset = self.MSIM_PRESETS[val('.f-preset')];
           const { label, ...identity } = preset;
           const dev = { ...identity, cat: 'custom', id: 'custom-' + Date.now(), name: val('.f-name') || `Custom ${w}×${h}`, w, h, dpr };
           if (val('.f-ua')) dev.ua = val('.f-ua');
           customs = [...customs, dev];
           await chrome.storage.local.set({ customDevices: customs });
-          toast('Custom device saved');
+          toast(T('Custom device saved'));
           renderPicker();
         };
       }
@@ -1364,7 +1369,84 @@
   $('.close-panel').onclick = () => $('.panel').classList.remove('show');
   $('.search').addEventListener('input', renderPicker);
   $('.sync').onclick = () => togglePop('.sync-pop');
-  $('.settings').onclick = () => togglePop('.set-pop');
+  const LANGS = [['', 'Browser default'], ['th-TH', 'ไทย (th-TH)'], ['en-US', 'English (en-US)'], ['en-GB', 'English (en-GB)'], ['ja-JP', '日本語 (ja-JP)'],
+    ['zh-CN', '中文 (zh-CN)'], ['ko-KR', '한국어 (ko-KR)'], ['vi-VN', 'Tiếng Việt (vi-VN)'], ['de-DE', 'Deutsch (de-DE)'], ['fr-FR', 'Français (fr-FR)']];
+  const PLACES = [['', 'Real location'], ['13.7563,100.5018', 'Bangkok'], ['18.7883,98.9853', 'Chiang Mai'], ['35.6762,139.6503', 'Tokyo'],
+    ['1.3521,103.8198', 'Singapore'], ['51.5072,-0.1276', 'London'], ['40.7128,-74.0060', 'New York'], ['37.7749,-122.4194', 'San Francisco'], ['custom', 'Custom…']];
+  function renderSettingsMore() {
+    const box = $('.set-more');
+    const geoVal = prefs.geo ? `${prefs.geo.lat},${prefs.geo.lng}` : '';
+    const known = PLACES.some(([v]) => v === geoVal);
+    box.innerHTML = `
+      <div class="row2"><span>${T('Page language')}</span><select class="set-lang">${LANGS.map(([v, l]) => `<option value="${v}" ${v === (prefs.lang || '') ? 'selected' : ''}>${escapeHtml(T(l))}</option>`).join('')}</select></div>
+      <div class="row2"><span>${T('Location (GPS)')}</span><select class="set-geo">${PLACES.map(([v, l]) => `<option value="${v}" ${(known ? v === geoVal : v === 'custom') ? 'selected' : ''}>${escapeHtml(T(l))}</option>`).join('')}</select></div>
+      <div class="row2 geo-custom" style="display:${known ? 'none' : ''}"><input class="set-geo-txt" placeholder="${T('Latitude, longitude')}" value="${escapeHtml(geoVal)}"></div>
+      <div class="row2"><span>${T('Interface language')}</span><select class="set-ui"><option value="en" ${uiLang === 'en' ? 'selected' : ''}>English</option><option value="th" ${uiLang === 'th' ? 'selected' : ''}>ไทย</option></select></div>
+      <h4 class="sub">${T('Saved device sets')}</h4>
+      <div class="sets">${(prefs.deviceSets || []).map((x, n) => `<span class="set-item"><button class="btn set-load" data-n="${n}">${escapeHtml(x.name)}</button><button class="btn set-del" data-n="${n}">×</button></span>`).join('') || `<span class="note">${T('No saved sets yet')}</span>`}</div>
+      <div class="row2"><input class="set-name" placeholder="${T('Name for this set')}"><button class="btn primary set-save">${T('Save current set')}</button></div>`;
+    const q = (x) => box.querySelector(x);
+    q('.set-lang').onchange = async (e) => {
+      prefs.lang = e.target.value;
+      await chrome.storage.local.set({ lang: prefs.lang });
+      await save({ lang: prefs.lang });
+      renameAll();
+      reloadAll();
+    };
+    const applyGeo = async (geo) => {
+      prefs.geo = geo;
+      await chrome.storage.local.set({ geo });
+      renameAll();
+      reloadAll();
+    };
+    q('.set-geo').onchange = (e) => {
+      const v = e.target.value;
+      q('.geo-custom').style.display = v === 'custom' ? '' : 'none';
+      if (v === 'custom') return q('.set-geo-txt').focus();
+      if (!v) return applyGeo(null);
+      const [lat, lng] = v.split(',').map(Number);
+      applyGeo({ lat, lng });
+    };
+    q('.set-geo-txt').onchange = (e) => {
+      const [lat, lng] = e.target.value.split(',').map((x) => Number(x.trim()));
+      if (Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) applyGeo({ lat, lng });
+      else toast(T('Latitude, longitude') + '?', 1600);
+    };
+    q('.set-ui').onchange = async (e) => {
+      await chrome.storage.local.set({ uiLang: e.target.value });
+      location.reload(); // rebuilds the shell in the new language
+    };
+    q('.set-save').onclick = async () => {
+      const name = q('.set-name').value.trim() || state.devices.map((d) => lookup(d.id).name).join(' + ');
+      prefs.deviceSets = [...(prefs.deviceSets || []), { name, devices: JSON.parse(JSON.stringify(state.devices)) }];
+      await chrome.storage.local.set({ deviceSets: prefs.deviceSets });
+      renderSettingsMore();
+      toast(T('Set saved'), 1400);
+    };
+    for (const b of box.querySelectorAll('.set-load')) b.onclick = () => loadSet(prefs.deviceSets[Number(b.dataset.n)]);
+    for (const b of box.querySelectorAll('.set-del')) b.onclick = async () => {
+      prefs.deviceSets.splice(Number(b.dataset.n), 1);
+      await chrome.storage.local.set({ deviceSets: prefs.deviceSets });
+      renderSettingsMore();
+    };
+  }
+  async function loadSet(set) {
+    if (!set) return;
+    state.devices = JSON.parse(JSON.stringify(set.devices)).filter((d) => allDevices().some((x) => x.id === d.id));
+    if (!state.devices.length) return;
+    state.active = 0;
+    state.primary = 0;
+    const ua = devOf(state.devices[0]).ua;
+    await save({ devices: state.devices, active: 0, primary: 0, ua });
+    closePops();
+    rebuildAll();
+    updateShotRows();
+    toast(T('Set loaded'), 1400);
+  }
+  $('.settings').onclick = () => {
+    renderSettingsMore();
+    togglePop('.set-pop');
+  };
   $('.set-touch').checked = state.touchEmu !== false;
   $('.set-bars').checked = !!ui().bars;
   $('.set-kbd').checked = ui().keyboard !== false;

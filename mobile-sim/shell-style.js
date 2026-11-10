@@ -10,8 +10,8 @@ self.MSIM_CSS = `
   --ink: #0f380f;
   --bg: #0b1f0b;
   --px: 3px;
-  --pixel: "MSIM Press", ui-monospace, monospace;
-  --term: "MSIM VT", ui-monospace, monospace;
+  --pixel: "MSIM Press", "Thonburi", "Noto Sans Thai", "Leelawadee UI", ui-monospace, monospace;
+  --term: "MSIM VT", "Thonburi", "Noto Sans Thai", "Leelawadee UI", ui-monospace, monospace;
 }
 * { box-sizing: border-box; }
 button, input, select { font: inherit; color: inherit; }
@@ -300,6 +300,16 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .toggle input:checked + span { background: var(--g0); }
 .toggle input:checked + span::after { transform: translateX(20px); background: var(--g3); }
 
+/* settings extras */
+.pop h4.sub { margin: 16px 4px 8px; }
+.row2 input:not([type]), .row2 input[type=text], .pop .row2 input.set-name, .pop .row2 input.set-geo-txt { flex: 1; height: 28px; padding: 0 8px; margin: 3px;
+  background: #c9de6a; color: var(--ink); border: 0; font: 18px/1 var(--term); box-shadow: 0 0 0 2px var(--g0); }
+.set-pop { width: 380px; max-height: calc(100vh - 80px); overflow: auto; }
+.sets { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px; }
+.set-item { display: inline-flex; }
+.set-item .btn { height: 26px; font-size: 8px; margin: 3px 0 3px 3px; }
+.set-item .set-del { min-width: 22px; padding: 0 5px; }
+
 /* device picker: a cartridge shelf */
 .panel { position: absolute; top: 54px; right: 0; bottom: 0; width: 480px; max-width: 100%; z-index: 9; background: var(--g1);
   border-left: 4px solid var(--g0); display: none; flex-direction: column; box-shadow: -10px 0 0 0 rgba(0,0,0,.35); }
@@ -351,6 +361,12 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .toast::after { content: "▼"; position: absolute; right: 12px; bottom: 9px; font-size: 14px; animation: blink .8s steps(1) infinite; }
 .toast.show { opacity: 1; }
 .toast.top { top: 8px; bottom: auto; z-index: 30; }
+/* Thai interface: the pixel font has no Thai glyphs, so labels use a readable Thai face */
+.app.th .btn, .app.th .pop h4, .app.th .panel h3, .app.th .chip, .app.th .caption .name, .app.th .badge, .app.th .stale h4, .app.th .rec-live {
+  font-family: "Thonburi", "Noto Sans Thai", "Leelawadee UI", sans-serif; font-size: 14px; font-weight: 600; text-transform: none; letter-spacing: 0; }
+.app.th .pop h4, .app.th .panel h3 { font-size: 16px; }
+.app.th .caption .name { font-family: var(--pixel); font-size: 9px; }
+
 /* respect the system "reduce motion" setting for decorative loops */
 @media (prefers-reduced-motion: reduce) {
   .logo .mascot, .toast.show img, .slot.active .caption .name::before, .rec-live .dot { animation: none !important; }

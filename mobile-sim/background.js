@@ -71,7 +71,7 @@ async function restoreKeptTabs() {
     const ruleBase = await allocRuleBase();
     const next = { ...state, ruleBase };
     await setState(tabId, next);
-    await installRules(tabId, ruleBase, next.ua || deviceById().ua);
+    await installRules(tabId, ruleBase, next.ua || deviceById().ua, next.lang);
     await setBadge(tabId, true);
     await chrome.tabs.reload(tabId, { bypassCache: true }).catch(() => {});
   }
@@ -82,7 +82,7 @@ chrome.runtime.onStartup.addListener(async () => {
   await chrome.storage.local.remove(Object.keys(all).filter((k) => k.startsWith('keep:tab:')));
 });
 
-async function installRules(tabId, base, ua) {
+async function installRules(tabId, base, ua, lang) {
   const [uaRule, frameRule, destRule, topCspRule] = ruleIds(base);
   await chrome.declarativeNetRequest.updateSessionRules({
     removeRuleIds: ruleIds(base),
@@ -94,6 +94,7 @@ async function installRules(tabId, base, ua) {
           type: 'modifyHeaders',
           requestHeaders: [
             { header: 'user-agent', operation: 'set', value: ua },
+            ...(lang ? [{ header: 'accept-language', operation: 'set', value: `${lang},${lang.split('-')[0]};q=0.9,en;q=0.5` }] : []),
             ...['sec-ch-ua', 'sec-ch-ua-mobile', 'sec-ch-ua-platform', 'sec-ch-ua-platform-version', 'sec-ch-ua-model',
               'sec-ch-ua-arch', 'sec-ch-ua-bitness', 'sec-ch-ua-full-version', 'sec-ch-ua-full-version-list', 'sec-ch-ua-wow64',
             ].map((header) => ({ header, operation: 'remove' })),
@@ -168,7 +169,8 @@ async function enable(tab) {
     devices, active: 0, primary: 0, zoom: lastZoom || 'fit', sync: { scroll: true, nav: true },
     ua: primary.ua, url: tab.url, ruleBase,
   });
-  await installRules(tab.id, ruleBase, primary.ua);
+  const { lang } = await chrome.storage.local.get('lang');
+  await installRules(tab.id, ruleBase, primary.ua, lang);
   await setBadge(tab.id, true);
   await chrome.tabs.reload(tab.id, { bypassCache: true });
 }
@@ -207,7 +209,7 @@ chrome.webNavigation.onCommitted.addListener(async (d) => {
 chrome.webNavigation.onDOMContentLoaded.addListener(async (d) => {
   if (d.frameId !== 0 || !(await getActiveState(d.tabId))) return;
   chrome.scripting
-    .executeScript({ target: { tabId: d.tabId, frameIds: [0] }, files: ['devices.js', 'icons.js', 'shell-style.js', 'capture.js', 'shell.js'] })
+    .executeScript({ target: { tabId: d.tabId, frameIds: [0] }, files: ['devices.js', 'icons.js', 'i18n.js', 'shell-style.js', 'capture.js', 'shell.js'] })
     .catch((e) => console.warn('shell injection failed', e));
 });
 
@@ -246,7 +248,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         await setState(tabId, next);
         await chrome.storage.local.set({ lastDevices: next.devices, lastZoom: next.zoom });
         // The User-Agent header is per tab, so it follows the primary device.
-        if (msg.patch.ua && msg.patch.ua !== state.ua) await installRules(tabId, next.ruleBase, next.ua);
+        if ((msg.patch.ua && msg.patch.ua !== state.ua) || 'lang' in msg.patch) await installRules(tabId, next.ruleBase, next.ua, next.lang);
+        if ('lang' in msg.patch) await chrome.storage.local.set({ lang: next.lang || '' });
         return reply(next);
       }
       case 'capture': {

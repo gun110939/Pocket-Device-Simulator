@@ -130,6 +130,63 @@
   document.addEventListener('click', (e) => retarget(e.target instanceof Element ? e.target.closest('a[href], area[href]') : null), true);
   document.addEventListener('submit', (e) => retarget(e.target instanceof HTMLFormElement ? e.target : null), true);
 
+  // ---- language / locale ----
+  if (c.lang) {
+    const langs = [c.lang, c.lang.split('-')[0]].filter((x, i, a) => a.indexOf(x) === i);
+    def(N, 'language', () => langs[0]);
+    def(N, 'languages', () => Object.freeze([...langs]));
+    // Intl and toLocale* use the chosen locale when the page does not pass one.
+    const pick = (loc) => (loc === undefined ? c.lang : loc);
+    for (const name of ['DateTimeFormat', 'NumberFormat', 'Collator', 'PluralRules', 'RelativeTimeFormat', 'ListFormat', 'DisplayNames', 'Segmenter']) {
+      const Orig = Intl[name];
+      if (!Orig) continue;
+      const Wrapped = function (loc, opts) {
+        return new.target ? new Orig(pick(loc), opts) : Orig(pick(loc), opts);
+      };
+      Wrapped.prototype = Orig.prototype;
+      Wrapped.supportedLocalesOf = Orig.supportedLocalesOf.bind(Orig);
+      try {
+        Object.defineProperty(Intl, name, { value: Wrapped, configurable: true, writable: true });
+      } catch {}
+    }
+    for (const [proto, fns] of [[Date.prototype, ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString']], [Number.prototype, ['toLocaleString']], [BigInt.prototype, ['toLocaleString']]]) {
+      for (const fn of fns) {
+        const orig = proto[fn];
+        proto[fn] = function (loc, opts) {
+          return orig.call(this, pick(loc), opts);
+        };
+      }
+    }
+    const lc = String.prototype.localeCompare;
+    String.prototype.localeCompare = function (that, loc, opts) {
+      return lc.call(this, that, pick(loc), opts);
+    };
+  }
+
+  // ---- geolocation ----
+  if (c.geo && navigator.geolocation) {
+    const position = () => ({
+      coords: { latitude: c.geo.lat, longitude: c.geo.lng, accuracy: 20, altitude: null, altitudeAccuracy: null, heading: null, speed: null,
+        toJSON() { return { latitude: this.latitude, longitude: this.longitude, accuracy: this.accuracy }; } },
+      timestamp: Date.now(),
+    });
+    let watchId = 0;
+    const G = Geolocation.prototype;
+    G.getCurrentPosition = function (ok) {
+      setTimeout(() => ok && ok(position()), 50);
+    };
+    G.watchPosition = function (ok) {
+      setTimeout(() => ok && ok(position()), 50);
+      return ++watchId;
+    };
+    G.clearWatch = function () {};
+    if (navigator.permissions && navigator.permissions.query) {
+      const q = navigator.permissions.query.bind(navigator.permissions);
+      navigator.permissions.query = (desc) =>
+        desc && desc.name === 'geolocation' ? Promise.resolve({ state: 'granted', name: 'geolocation', onchange: null, addEventListener() {}, removeEventListener() {} }) : q(desc);
+    }
+  }
+
   // ---- touch emulation: the mouse acts like a finger ----
   // The page receives touchstart/move/end instead of mouse events; dragging scrolls with
   // momentum; a tap still produces the click a phone would send.
