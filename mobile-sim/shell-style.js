@@ -134,6 +134,28 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .crease.h { left: 0; right: 0; top: 50%; height: 24px; margin-top: -12px;
   background: linear-gradient(180deg, transparent, rgba(0,0,0,.07) 45%, rgba(255,255,255,.12) 50%, rgba(0,0,0,.07) 55%, transparent); }
 .stage.capturing .screen { border-radius: 0 !important; }
+/* Responsive (free size): plain screen, dashed outline, drag handles and a breakpoint ruler */
+.device[data-style="responsive"] .body { background: none; box-shadow: 0 0 0 2px var(--g2), 0 18px 40px rgba(0,0,0,.45); }
+.device[data-style="responsive"] .face { display: none; }
+.stage.chroma .device[data-style="responsive"] .body { box-shadow: none; }
+.rhandle { position: absolute; z-index: 6; background: var(--g2); box-shadow: 0 0 0 3px var(--g0); touch-action: none; }
+.rhandle.e { right: -22px; top: 50%; width: 12px; height: 72px; margin-top: -36px; cursor: ew-resize; }
+.rhandle.s { bottom: -22px; left: 50%; height: 12px; width: 72px; margin-left: -36px; cursor: ns-resize; }
+.rhandle.se { right: -22px; bottom: -22px; width: 16px; height: 16px; cursor: nwse-resize; }
+.rhandle:hover { background: var(--g3); }
+.stage.resizing iframe { pointer-events: none; }
+.stage.chroma .rhandle, .stage.chroma .ruler, .stage.capturing .rhandle, .stage.capturing .ruler { display: none; }
+.ruler { position: absolute; left: 0; top: -54px; height: 34px; border-bottom: 3px solid var(--g1); pointer-events: none; }
+.ruler .mark { position: absolute; bottom: -3px; transform: translateX(-50%); pointer-events: auto; cursor: pointer;
+  font: 20px/1 var(--term); color: var(--g2); background: none; border: 0; padding: 0 0 8px; }
+.ruler .mark::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 3px; height: 8px; margin-left: -1px; background: var(--g2); }
+.ruler .mark.on { color: var(--g3); font-weight: bold; }
+.ruler .mark.on::after { background: var(--g3); height: 12px; }
+.caption .rsize { display: inline-flex; align-items: center; gap: 2px; color: var(--g2); font: 18px/1 var(--term); }
+.caption .rsize input, .caption select { width: 58px; height: 24px; margin: 0 2px; padding: 0 4px; background: #c9de6a; color: var(--g0);
+  border: 0; font: 18px/1 var(--term); box-shadow: 0 0 0 2px var(--g0); }
+.caption select { width: auto; }
+
 /* page loading: bar along the top of the screen, card after a short delay */
 .loadbar { position: absolute; left: 0; right: 0; top: 0; height: 4px; z-index: 9; pointer-events: none; overflow: hidden; background: rgba(15,56,15,.25); }
 .loadbar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%;

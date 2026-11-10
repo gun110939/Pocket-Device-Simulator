@@ -79,7 +79,7 @@
     if (d.fold) return d.fold.kind === 'flip' ? 'thumb-flip' : 'thumb-foldable';
     return ({ island: 'thumb-phone-ios', notch: 'thumb-phone-ios', classic: 'thumb-phone-ios', punch: 'thumb-phone-android',
       cover: 'thumb-phone-android', tablet: 'thumb-tablet', watch: 'thumb-watch', laptop: 'thumb-laptop', monitor: 'thumb-monitor',
-      tv: 'thumb-tv', kiosk: 'thumb-kiosk' })[d.style] || 'thumb-phone-android';
+      tv: 'thumb-tv', kiosk: 'thumb-kiosk', responsive: 'thumb-tablet' })[d.style] || 'thumb-phone-android';
   };
 
   root.innerHTML = `<style>${self.MSIM_CSS}</style>
@@ -188,13 +188,27 @@
   async function save(patch) {
     Object.assign(state, patch);
     const next = await send({ type: 'update', patch });
-    if (next && !next.error) state = { ...state, ...next };
+    // Local state stays the source of truth (handlers hold references to its objects);
+    // only fields the shell does not track are taken from the background's copy.
+    if (next && !next.error) state = Object.assign(state, { ...next, ...state });
   }
 
   const views = []; // per device: { slot, scaler, device, body, screen, iframe, lastUrl, followUntil }
 
+  // A device as currently configured: posture for foldables, size and identity for Responsive.
+  const RESP_SIZES = [[320, 568], [375, 667], [390, 844], [430, 932], [768, 1024], [820, 1180], [1024, 768], [1280, 800], [1440, 900], [1920, 1080]];
+  const BREAKPOINTS = [320, 375, 414, 600, 768, 1024, 1280, 1440, 1920];
+  const devOf = (inst) => {
+    const base = lookup(inst.id);
+    const d = resolve(base, inst.folded);
+    if (!base.responsive) return d;
+    const id = inst.desktop ? self.MSIM_PRESETS.desktop : self.MSIM_PRESETS.android;
+    return { ...d, ua: id.ua, platform: id.platform, vendor: id.vendor, touch: id.touch, os: id.os,
+      w: inst.rw || d.w, h: inst.rh || d.h, dpr: inst.rdpr || (inst.desktop ? 1 : d.dpr) };
+  };
+
   const cfgFor = (inst) => {
-    const d = resolve(lookup(inst.id), inst.folded);
+    const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
       landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua) };
   };
@@ -211,6 +225,7 @@
       case 'monitor': return { pad: [14, 14, 22, 14], radius: 10, screenRadius: 2, band: 2 };
       case 'tv': return { pad: [9, 9, 9, 9], radius: 6, screenRadius: 2, band: 2 };
       case 'kiosk': return { pad: [48, 26, 26, 26], radius: 14, screenRadius: 4, band: 12 };
+      case 'responsive': return { pad: [0, 0, 0, 0], radius: 0, screenRadius: 0, band: 0 };
       default: return { pad: [12, 12, 12, 12], radius: d.radius + 12, screenRadius: d.radius, band: 4 };
     }
   }
@@ -251,7 +266,7 @@
     const v = views[i];
     const inst = state.devices[i];
     const base = lookup(inst.id);
-    const d = resolve(base, inst.folded);
+    const d = devOf(inst);
     const landscape = !!inst.landscape;
     const w = landscape ? d.h : d.w;
     const h = landscape ? d.w : d.h;
@@ -382,6 +397,8 @@
       el('div', 'pfoot', v.device);
     }
 
+    if (base.responsive) drawResponsive(v, i, w, h);
+
     // caption
     const tags = [];
     if (state.devices.length > 1 && i === state.primary) tags.push('<span class="badge ua" title="User-Agent header comes from this device">UA</span>');
@@ -389,7 +406,11 @@
     v.caption.innerHTML = `
       <button class="name" title="Change device">${escapeHtml(base.name)} ▼</button>
       ${tags.join('')}
-      <span class="meta">${w}×${h - barH} @${d.dpr}x</span>
+      ${base.responsive ? `<span class="rsize"><input class="rw" type="number" min="200" max="3840" value="${w}">×<input class="rh" type="number" min="200" max="3840" value="${h}"></span>
+        <select class="rpreset" title="Common sizes"><option value="">Sizes</option>${RESP_SIZES.map(([a, b]) => `<option value="${a}x${b}">${a}×${b}</option>`).join('')}</select>
+        <select class="rdpr" title="Pixel ratio">${[1, 2, 3].map((x) => `<option value="${x}" ${x === d.dpr ? 'selected' : ''}>@${x}x</option>`).join('')}</select>
+        <button class="btn rmode ${inst.desktop ? 'on' : ''}" title="Identity: mobile (touch, mobile UA) or desktop">${inst.desktop ? 'Desktop' : 'Mobile'}</button>`
+      : `<span class="meta">${w}×${h - barH} @${d.dpr}x</span>`}
       <button class="btn fin" title="Finish: ${escapeHtml(finish.name)} (click for the next colour)"><i style="background:${finish.metal}"></i></button>
       <button class="btn rot" title="Rotate">${I('rotate')}</button>
       ${base.fold ? `<button class="btn fold ${inst.folded ? '' : 'on'}" title="Fold / unfold">${I('fold')}${inst.folded ? 'Unfold' : 'Fold'}</button>` : ''}
@@ -398,11 +419,13 @@
     v.caption.querySelector('.name').onclick = () => openPicker('replace', i);
     v.caption.querySelector('.rot').onclick = () => rotateDevice(i);
     v.caption.querySelector('.fin').onclick = () => {
-      inst.finish = ((inst.finish || 0) + 1) % finishes.length;
+      const now = state.devices[i];
+      now.finish = ((now.finish || 0) + 1) % finishes.length;
       shapeView(i);
       save({ devices: state.devices });
-      toast(finish === finishes[inst.finish] ? finish.name : finishes[inst.finish].name, 1400);
+      toast(finishes[now.finish].name, 1400);
     };
+    if (base.responsive) wireResponsive(v, i);
     const fb = v.caption.querySelector('.fold');
     if (fb) fb.onclick = () => foldDevice(i);
     const mk = v.caption.querySelector('.mkua');
@@ -443,6 +466,117 @@
     if (!text) return c && c.remove();
     if (!c) c = el('div', 'chip', v.slot);
     c.textContent = text;
+  }
+
+  // ---- Responsive (free size) ----
+  function drawResponsive(v, i, w, h) {
+    // breakpoint ruler above the screen, in the device's own CSS px
+    const ruler = el('div', 'ruler', v.device);
+    // marks up to the screen width plus the next breakpoint, so the ruler stays near the device
+    const next = BREAKPOINTS.find((bp) => bp > w) || w;
+    const span = Math.min(next, Math.round(w * 1.35));
+    ruler.style.width = Math.max(w, span) + 'px';
+    let tier = 0;
+    for (const bp of BREAKPOINTS) if (w >= bp) tier = bp;
+    for (const bp of BREAKPOINTS) {
+      if (bp > span) break;
+      const m = el('button', 'mark' + (bp === tier ? ' on' : ''), ruler);
+      m.style.left = bp + 'px';
+      m.textContent = bp;
+      m.title = `Set width to ${bp}px`;
+      m.onclick = () => setResponsiveSize(i, bp, null);
+    }
+    // drag handles: right edge, bottom edge, corner
+    for (const kind of ['e', 's', 'se']) {
+      const hd = el('div', 'rhandle ' + kind, v.body);
+      hd.addEventListener('pointerdown', (ev) => startResize(ev, v, i, kind));
+    }
+  }
+
+  function setResponsiveSize(i, w, h) {
+    const inst = state.devices[i];
+    const d = devOf(inst);
+    const cw = inst.landscape ? d.h : d.w, ch = inst.landscape ? d.w : d.h;
+    const nw = Math.max(200, Math.min(3840, Math.round(w ?? cw)));
+    const nh = Math.max(200, Math.min(3840, Math.round(h ?? ch)));
+    // stored in portrait terms
+    if (inst.landscape) Object.assign(inst, { rw: nh, rh: nw });
+    else Object.assign(inst, { rw: nw, rh: nh });
+    reshape(i, {});
+    scheduleLayout();
+  }
+
+  function startResize(ev, v, i, kind) {
+    ev.preventDefault();
+    const handle = ev.currentTarget;
+    handle.setPointerCapture(ev.pointerId);
+    const inst = state.devices[i];
+    const d = devOf(inst);
+    const w0 = inst.landscape ? d.h : d.w, h0 = inst.landscape ? d.w : d.h;
+    const scale = Number(stage.dataset.scale) || 1;
+    const x0 = ev.clientX, y0 = ev.clientY;
+    stage.classList.add('resizing');
+    frozenScale = scale; // keep the zoom steady while dragging
+    let w = w0, h = h0;
+    const move = (e) => {
+      if (kind.includes('e')) w = Math.max(200, Math.min(3840, Math.round(w0 + (e.clientX - x0) / scale)));
+      if (kind.includes('s')) h = Math.max(200, Math.min(3840, Math.round(h0 + (e.clientY - y0) / scale)));
+      v.screen.style.width = w + 'px';
+      v.screen.style.height = h + 'px';
+      const rw = v.caption.querySelector('.rw'), rh = v.caption.querySelector('.rh');
+      if (rw) rw.value = w;
+      if (rh) rh.value = h;
+      layout();
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      stage.classList.remove('resizing');
+      frozenScale = 0;
+      setResponsiveSize(i, w, h);
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  }
+
+  function wireResponsive(v, i) {
+    const cur = () => state.devices[i];
+    const q = (s) => v.caption.querySelector(s);
+    const apply = () => setResponsiveSize(i, Number(q('.rw').value), Number(q('.rh').value));
+    for (const s of ['.rw', '.rh']) {
+      q(s).addEventListener('change', apply);
+      q(s).addEventListener('keydown', (e) => e.key === 'Enter' && apply());
+    }
+    q('.rpreset').onchange = (e) => {
+      if (!e.target.value) return;
+      const [w, h] = e.target.value.split('x').map(Number);
+      cur().landscape = false;
+      setResponsiveSize(i, w, h);
+    };
+    q('.rdpr').onchange = (e) => {
+      cur().rdpr = Number(e.target.value);
+      reloadView(i);
+    };
+    q('.rmode').onclick = () => {
+      cur().desktop = !cur().desktop;
+      cur().rdpr = 0;
+      reloadView(i);
+    };
+  }
+
+  // Recreate one viewport (identity changed); the header UA follows if it is the primary device.
+  async function reloadView(i) {
+    const patch = { devices: state.devices };
+    if (i === state.primary) patch.ua = devOf(state.devices[i]).ua;
+    await save(patch);
+    const old = views[i];
+    old.lastUrl && (currentUrl = old.lastUrl);
+    views[i] = createView(i);
+    old.slot.replaceWith(views[i].slot);
+    shapeView(i);
+    scheduleLayout();
   }
 
   function escapeHtml(s) {
@@ -612,7 +746,7 @@
   }
 
   async function setPrimary(i) {
-    const ua = lookup(state.devices[i].id).ua;
+    const ua = devOf(state.devices[i]).ua;
     await save({ primary: i, ua });
     refreshCaptions();
     reloadAll();
@@ -625,7 +759,7 @@
     if (state.primary === i) state.primary = 0;
     else if (state.primary > i) state.primary--;
     state.active = Math.min(state.active, state.devices.length - 1);
-    const ua = lookup(state.devices[state.primary].id).ua;
+    const ua = devOf(state.devices[state.primary]).ua;
     const uaChanged = ua !== state.ua;
     await save({ devices: state.devices, primary: state.primary, active: state.active, ua });
     if (uaChanged) reloadAll();
@@ -670,15 +804,18 @@
     });
   }
 
+  let frozenScale = 0;
   function computeScale(overrides = {}) {
     if (!views.length) return 1;
+    if (frozenScale) return frozenScale;
     const sizes = views.map((v, i) => overrides[i] || [v.device.offsetWidth, v.device.offsetHeight]);
     const gap = 40;
     let scale = Number(state.zoom);
     if (!scale) {
       const aw = stage.clientWidth - 64 - gap * (views.length - 1);
       // room for the caption plates (they wrap to two lines under narrow devices)
-      const ah = stage.clientHeight - 48 - 96;
+      const resp = views.some((v, i) => lookup(state.devices[i].id).responsive);
+      const ah = stage.clientHeight - 48 - 96 - (resp ? 110 : 0); // ruler above, taller caption below
       const sumW = sizes.reduce((a, s) => a + s[0], 0);
       const maxH = Math.max(...sizes.map((s) => s[1]));
       scale = Math.min(1, aw / sumW, ah / maxH);
@@ -705,6 +842,8 @@
       v.scaler.style.width = sizes[i][0] * scale + 'px';
       v.scaler.style.height = sizes[i][1] * scale + 'px';
       v.slot.style.width = Math.max(230, sizes[i][0] * scale) + 'px';
+      // room above for the Responsive ruler
+      v.slot.style.paddingTop = lookup(state.devices[i].id).responsive ? Math.round(60 * scale) + 'px' : '';
     });
     stage.dataset.scale = String(scale);
   }
@@ -908,7 +1047,7 @@
       stage.classList.remove('capturing');
       let c = cap.crop(img, k, v.screen.getBoundingClientRect());
       if ($('.shot-round').checked) {
-        const d = resolve(lookup(state.devices[i].id), state.devices[i].folded);
+        const d = devOf(state.devices[i]);
         c = cap.roundCorners(c, (d.radius || 0) * Number(stage.dataset.scale || 1) * k);
       }
       return c;

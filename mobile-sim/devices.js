@@ -142,6 +142,9 @@
     phone('special', 'monitor-fhd', 'Desktop monitor 1080p', 1920, 1080, 1, 'monitor', 6, 0, win),
     phone('special', 'tv-4k', 'Smart TV 4K', 1920, 1080, 2, 'tv', 4, 0, tv),
     phone('special', 'kiosk', 'Self-service kiosk', 1080, 1920, 1, 'kiosk', 8, 0, { ...androidTab, touch: true }),
+    // Free size: drag the edges or type a size; identity switches between mobile and desktop.
+    { cat: 'special', id: 'responsive', name: 'Responsive (free size)', responsive: true, w: 390, h: 844, dpr: 2,
+      style: 'responsive', radius: 0, bar: 0, ...android },
   ];
 
   // ---- finishes (body metal colour, front glass colour) and side-button layouts ----
@@ -192,7 +195,7 @@
     'galaxy-z-fold8': ['fold', 'fold'], 'galaxy-z-fold8-ultra': ['fold', 'fold'], 'galaxy-z-fold7': ['fold', 'fold'], 'galaxy-z-flip7': ['flip', 'flip'], 'pixel-10-pro-fold': ['pixel', 'pixel'], 'iphone-duo': ['pro17', 'duo'],
     'ipad-mini': ['ipad', 'ipad'], 'ipad-air-11': ['ipad', 'ipad'], 'ipad-pro-11': ['ipad', 'ipad'], 'ipad-pro-13': ['ipad', 'ipad'],
     'galaxy-tab-s9': ['tab', 'tab'], 'apple-watch': ['watch', 'watch'], 'macbook-air-13': ['mac', null], 'macbook-pro-16': ['mac', null],
-    'laptop-hd': ['dark', null], 'monitor-fhd': ['dark', null], 'tv-4k': ['dark', null], 'kiosk': ['kiosk', null],
+    'laptop-hd': ['dark', null], 'monitor-fhd': ['dark', null], 'tv-4k': ['dark', null], 'kiosk': ['kiosk', null], 'responsive': ['dark', null],
   };
   for (const d of self.MSIM_DEVICES) {
     const [fin, btn] = LOOK[d.id] || ['dark', null];
