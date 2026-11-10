@@ -156,6 +156,35 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
   border: 0; font: 18px/1 var(--term); box-shadow: 0 0 0 2px var(--g0); }
 .caption select { width: auto; }
 
+/* browser bars (a realistic look, not the pixel theme) */
+.bbar { flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; z-index: 2; position: relative;
+  font: 500 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; }
+.bbar .host { flex: 1; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bbar .bb-l, .bbar .bb-r { width: 22px; text-align: center; color: #333; font-size: 14px; }
+.bbar.ios.bottom { height: 82px; align-items: flex-start; padding-top: 10px; background: rgba(248,248,248,.96); box-shadow: 0 -1px 0 rgba(0,0,0,.12); }
+.bbar.ios.bottom .host, .bbar.ios.top .host { background: #e6e6ea; border-radius: 12px; padding: 11px 10px; }
+.bbar.ios.top { height: 52px; background: #f7f7f8; box-shadow: 0 1px 0 rgba(0,0,0,.12); }
+.bbar.android { height: 56px; background: #fff; box-shadow: 0 1px 0 rgba(0,0,0,.1); }
+.bbar.android .host { text-align: left; background: #eef0f3; border-radius: 22px; padding: 10px 14px; color: #222; }
+.stage.capturing .guides, .stage.chroma .guides { display: none; }
+.guides { position: absolute; inset: 0; z-index: 7; pointer-events: none; border-style: solid; border-color: rgba(255,0,128,.22);
+  box-shadow: inset 0 0 0 1px rgba(255,0,128,.6); }
+/* virtual keyboard */
+.kbd { position: absolute; left: 0; right: 0; bottom: 0; z-index: 8; display: flex; flex-direction: column; justify-content: center; gap: 9px;
+  padding: 8px 4px 26px; font: 400 22px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; user-select: none; }
+.kbd.ios { background: rgba(209,211,217,.98); }
+.kbd.android { background: #e8eaed; padding-bottom: 20px; }
+.krow { display: flex; justify-content: center; gap: 6px; padding: 0 3px; }
+.key { flex: 1; max-width: 46px; height: 44px; border: 0; border-radius: 6px; background: #fff; color: #000; font: inherit; cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0,0,0,.35); padding: 0; }
+.key:active { background: #c8cbd2; }
+.key.wide { max-width: 90px; flex: 1.5; font-size: 16px; background: #abb0ba; }
+.key.space { flex: 5; max-width: none; font-size: 16px; background: #fff; }
+.key.ret { flex: 2; max-width: 110px; font-size: 16px; background: #abb0ba; }
+.kbd.android .key { border-radius: 8px; box-shadow: none; }
+.kbd.num .key { max-width: none; height: 46px; font-size: 26px; }
+.stage.chroma .kbd, .stage.capturing .kbd { }
+
 /* page loading: bar along the top of the screen, card after a short delay */
 .loadbar { position: absolute; left: 0; right: 0; top: 0; height: 4px; z-index: 9; pointer-events: none; overflow: hidden; background: rgba(15,56,15,.25); }
 .loadbar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%;

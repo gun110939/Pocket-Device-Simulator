@@ -90,7 +90,7 @@
     <div class="grp">
       <button class="btn add" title="Add another device to this tab">${I('plus')}Device</button>
       <button class="btn sync" title="Sync options">${I('sync')}Sync</button>
-      <button class="btn touch" title="Mouse acts like a finger on touch devices (drag to scroll, touch events)">${I('hand')}Touch</button>
+      <button class="btn settings" title="Settings">${I('gear')}</button>
       <select class="zoom" title="Zoom">
         <option value="fit">Fit</option><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.33">33%</option>
       </select>
@@ -112,6 +112,15 @@
     <div class="row2"><span>Scroll position</span><label class="toggle"><input type="checkbox" class="sync-scroll"><span></span></label></div>
     <div class="row2"><span>Navigation (links, back)</span><label class="toggle"><input type="checkbox" class="sync-nav"><span></span></label></div>
     <div class="note">The User-Agent header is per tab, so it follows the device marked UA. Each device still reports its own identity to page scripts.</div>
+  </div>
+
+  <div class="pop set-pop" style="left:200px">
+    <h4>Settings</h4>
+    <div class="row2"><span>Touch: mouse acts like a finger</span><label class="toggle"><input type="checkbox" class="set-touch"><span></span></label></div>
+    <div class="row2"><span>Browser bars (Safari / Chrome)</span><label class="toggle"><input type="checkbox" class="set-bars"><span></span></label></div>
+    <div class="row2"><span>Virtual keyboard</span><label class="toggle"><input type="checkbox" class="set-kbd"><span></span></label></div>
+    <div class="row2"><span>Show safe-area guides</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
+    <div class="set-more"></div>
   </div>
 
   <div class="pop shot-pop" style="right:84px">
@@ -208,10 +217,21 @@
       w: inst.rw || d.w, h: inst.rh || d.h, dpr: inst.rdpr || (inst.desktop ? 1 : d.dpr) };
   };
 
+  const ui = () => (state.ui = state.ui || { bars: false, keyboard: true, guides: false });
+  // Safe-area insets Safari reports for this device, orientation and browser-bar mode.
+  function safeInsets(inst, d) {
+    if (!['island', 'notch'].includes(d.style) || inst.folded === false && lookup(inst.id).fold) return { t: 0, r: 0, b: 0, l: 0 };
+    if (inst.landscape) {
+      const side = d.style === 'island' ? 62 : 47;
+      return { t: 0, r: side, b: 21, l: side };
+    }
+    return { t: 0, r: 0, b: ui().bars ? 0 : 34, l: 0 };
+  }
+
   const cfgFor = (inst) => {
     const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
-      landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false };
+      landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false, safe: safeInsets(inst, d) };
   };
 
   const PHONE_STYLES = ['island', 'notch', 'punch', 'classic', 'cover'];
@@ -290,7 +310,7 @@
 
     // decorations: everything except the screen and the iframe is rebuilt
     for (const n of [...v.body.children]) if (n !== v.screen) n.remove();
-    for (const n of [...v.screen.children]) if (n !== v.iframe) n.remove();
+    for (const n of [...v.screen.children]) if (n !== v.iframe && n !== v.kbd) n.remove();
     drawLoading(v);
     for (const n of [...v.device.children]) if (n !== v.body && !n.classList.contains('rig')) n.remove();
 
@@ -336,6 +356,33 @@
       }
       status.innerHTML = '<span class="time"></span><span class="icons"><span class="sig"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span class="batt"><i></i></span></span>';
       v.screen.insertBefore(status, v.iframe);
+    }
+
+    // browser bars: Safari keeps its address bar at the bottom on iPhone, Chrome at the top
+    const bars = ui().bars && (phoneLike || d.style === 'tablet');
+    if (bars) {
+      const where = d.os === 'ios' && phoneLike ? (landscape ? 'top' : 'bottom') : 'top';
+      const bb = el('div', `bbar ${where} ${d.os === 'ios' ? 'ios' : 'android'}`);
+      bb.innerHTML = `<span class="bb-l">${d.os === 'ios' ? 'AA' : '⌂'}</span><span class="host"></span><span class="bb-r">${d.os === 'ios' ? '↻' : '⋮'}</span>`;
+      if (where === 'top') v.screen.insertBefore(bb, v.iframe);
+      else v.screen.appendChild(bb);
+      updateHost(v);
+    }
+    // Landscape on notch/island phones: without viewport-fit=cover Safari keeps the page clear
+    // of the cut-out with side margins in the page's background colour.
+    const sa = safeInsets(inst, d);
+    if (landscape && (sa.l || sa.r) && !v.cover) {
+      v.iframe.style.margin = `0 ${sa.r}px 0 ${sa.l}px`;
+      v.iframe.style.width = `calc(100% - ${sa.l + sa.r}px)`;
+      v.screen.style.background = v.pageBg || '#fff';
+    } else {
+      v.iframe.style.margin = '';
+      v.iframe.style.width = '';
+      v.screen.style.background = '';
+    }
+    if (ui().guides && (sa.t || sa.r || sa.b || sa.l)) {
+      const gd = el('div', 'guides', v.screen);
+      Object.assign(gd.style, { borderWidth: `${sa.t + barH}px ${sa.r}px ${sa.b}px ${sa.l}px` });
     }
 
     const cut = (css) => Object.assign(el('div', 'cutout', v.screen).style, css);
@@ -467,6 +514,76 @@
     if (!text) return c && c.remove();
     if (!c) c = el('div', 'chip', v.slot);
     c.textContent = text;
+  }
+
+  function updateHost(v) {
+    let host = '';
+    try {
+      host = new URL(v.lastUrl || currentUrl).host;
+    } catch {}
+    for (const h of v.screen.querySelectorAll('.bbar .host')) h.textContent = host;
+  }
+
+  // ---- virtual keyboard ----
+  const KB_ROWS = {
+    text: [['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'], ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'], ['⇧', 'z', 'x', 'c', 'v', 'b', 'n', 'm', '⌫'], ['123', 'space', 'return']],
+    sym: [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'], ['-', '/', ':', ';', '(', ')', '$', '&', '@', '"'], ['#+=', '.', ',', '?', '!', "'", '⌫'], ['ABC', 'space', 'return']],
+    num: [['1', '2', '3'], ['4', '5', '6'], ['7', '8', '9'], ['.', '0', '⌫']],
+  };
+  function showKeyboard(v, i, kind) {
+    hideKeyboard(v, true);
+    const d = devOf(state.devices[i]);
+    const landscape = !!state.devices[i].landscape;
+    const tablet = d.style === 'tablet';
+    const h = kind === 'num' ? (landscape ? 170 : 216) : tablet ? (landscape ? 400 : 320) : landscape ? 200 : d.os === 'ios' ? 291 : 280;
+    const kb = el('div', `kbd ${d.os === 'ios' ? 'ios' : 'android'} ${kind === 'num' ? 'num' : ''}`, v.screen);
+    kb.style.height = h + 'px';
+    let layout = kind === 'num' ? 'num' : 'text', shift = false;
+    const draw = () => {
+      kb.innerHTML = '';
+      for (const row of KB_ROWS[layout]) {
+        const r = el('div', 'krow', kb);
+        for (const k of row) {
+          const key = el('button', 'key' + (k.length > 1 && k !== '⌫' ? ' wide' : '') + (k === 'space' ? ' space' : '') + (k === 'return' ? ' ret' : ''), r);
+          key.dataset.k = k;
+          key.textContent = k === 'space' ? (d.os === 'ios' ? 'space' : '') : k.length === 1 && shift ? k.toUpperCase() : k;
+          if (k === 'return' && kind === 'url') key.textContent = 'go';
+          key.addEventListener('mousedown', (e) => e.preventDefault()); // keep focus in the page
+          key.addEventListener('click', () => {
+            if (k === '⇧') { shift = !shift; return draw(); }
+            if (k === '123' || k === '#+=') { layout = 'sym'; return draw(); }
+            if (k === 'ABC') { layout = 'text'; return draw(); }
+            const send = k === '⌫' ? 'Backspace' : k === 'return' ? 'Enter' : k === 'space' ? ' ' : shift ? k.toUpperCase() : k;
+            v.iframe.contentWindow.postMessage({ msim: true, type: 'key', key: send }, '*');
+            if (shift && k.length === 1) { shift = false; draw(); }
+          });
+        }
+      }
+      if (kind === 'email' && layout === 'text') {
+        const last = kb.lastChild;
+        for (const k of ['@', '.']) {
+          const key = el('button', 'key', last);
+          key.textContent = k;
+          key.addEventListener('mousedown', (e) => e.preventDefault());
+          key.addEventListener('click', () => v.iframe.contentWindow.postMessage({ msim: true, type: 'key', key: k }, '*'));
+          last.insertBefore(key, last.children[1]);
+        }
+      }
+    };
+    draw();
+    kb.animate([{ transform: 'translateY(100%)' }, { transform: 'translateY(0)' }], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    v.kbd = kb;
+    v.iframe.contentWindow.postMessage({ msim: true, type: 'kbd', h }, '*');
+  }
+  function hideKeyboard(v, instant) {
+    if (!v.kbd) return;
+    const kb = v.kbd;
+    v.kbd = null;
+    try {
+      v.iframe.contentWindow.postMessage({ msim: true, type: 'kbd', h: 0 }, '*');
+    } catch {}
+    if (instant) return kb.remove();
+    kb.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(100%)' }], { duration: 180, easing: 'ease-in' }).finished.then(() => kb.remove(), () => kb.remove());
   }
 
   // ---- Responsive (free size) ----
@@ -621,6 +738,7 @@
     const deg = inst.landscape ? 90 : -90; // portrait -> landscape turns counter-clockwise
     v.body.style.willChange = 'transform';
     chip(v, 'Rotating');
+    hideKeyboard(v, true);
     await finished(v.body.animate([{ transform: 'rotate(0deg)' }, { transform: `rotate(${deg}deg)` }],
       { duration: 480, easing: 'cubic-bezier(.45,.05,.25,1)', fill: 'forwards' }));
     v.body.getAnimations().forEach((a) => a.cancel());
@@ -884,12 +1002,28 @@
     if (from < 0) return;
     if (data.type === 'loading') {
       setLoading(views[from], true);
+      hideKeyboard(views[from], true);
+      return;
+    }
+    if (data.type === 'kbd') {
+      const v = views[from];
+      if (data.show && ui().keyboard && devOf(state.devices[from]).touch) showKeyboard(v, from, data.kind);
+      else if (!data.show) hideKeyboard(v);
+      return;
+    }
+    if (data.type === 'viewport') {
+      const v = views[from];
+      const changed = v.cover !== data.cover || v.pageBg !== data.bg;
+      v.cover = data.cover;
+      v.pageBg = data.bg && data.bg !== 'rgba(0, 0, 0, 0)' ? data.bg : '#fff';
+      if (changed && state.devices[from].landscape) shapeView(from);
       return;
     }
     if (data.type === 'nav') {
       const v = views[from];
       const followed = performance.now() < v.followUntil;
       v.lastUrl = data.url;
+      updateHost(v);
       if (from === state.active) {
         setUrl(data.url);
         if (data.title) document.title = '📱 ' + data.title;
@@ -960,7 +1094,7 @@
   }
 
   // ---- popovers ----
-  const pops = ['.sync-pop', '.shot-pop', '.rec-pop'];
+  const pops = ['.sync-pop', '.set-pop', '.shot-pop', '.rec-pop'];
   function togglePop(sel) {
     for (const p of pops) if (p !== sel) $(p).classList.remove('show');
     $('.panel').classList.remove('show');
@@ -971,7 +1105,7 @@
   }
   root.addEventListener('pointerdown', (e) => {
     const path = e.composedPath();
-    if (!path.some((n) => n.classList && (n.classList.contains('pop') || n.classList.contains('shot') || n.classList.contains('rec') || n.classList.contains('sync')))) closePops();
+    if (!path.some((n) => n.classList && (n.classList.contains('pop') || n.classList.contains('shot') || n.classList.contains('rec') || n.classList.contains('sync') || n.classList.contains('settings')))) closePops();
   });
 
   const pickOpt = (container) => {
@@ -1230,21 +1364,40 @@
   $('.close-panel').onclick = () => $('.panel').classList.remove('show');
   $('.search').addEventListener('input', renderPicker);
   $('.sync').onclick = () => togglePop('.sync-pop');
-  const touchBtn = $('.touch');
-  touchBtn.classList.toggle('on', state.touchEmu !== false);
-  touchBtn.onclick = async () => {
-    state.touchEmu = state.touchEmu === false;
-    touchBtn.classList.toggle('on', state.touchEmu);
+  $('.settings').onclick = () => togglePop('.set-pop');
+  $('.set-touch').checked = state.touchEmu !== false;
+  $('.set-bars').checked = !!ui().bars;
+  $('.set-kbd').checked = ui().keyboard !== false;
+  $('.set-safe').checked = !!ui().guides;
+  // settings read by the page at start-up need fresh viewports
+  const renameAll = () => views.forEach((v, i) => {
+    try {
+      v.iframe.contentWindow.name = 'msim:' + encodeURIComponent(JSON.stringify(cfgFor(state.devices[i])));
+    } catch {}
+  });
+  $('.set-touch').onchange = async (e) => {
+    state.touchEmu = e.target.checked;
     await save({ touchEmu: state.touchEmu });
-    // the setting is read when a page starts, so rebuild the viewports
+    renameAll();
+    reloadAll();
+  };
+  const setUi = async (patch) => {
+    state.ui = { ...ui(), ...patch };
+    await save({ ui: state.ui });
     views.forEach((v, i) => {
+      shapeView(i);
       try {
-        v.iframe.contentWindow.name = 'msim:' + encodeURIComponent(JSON.stringify(cfgFor(state.devices[i])));
+        v.iframe.contentWindow.postMessage({ msim: true, type: 'config', cfg: cfgFor(state.devices[i]) }, '*');
       } catch {}
     });
-    reloadAll();
-    toast(state.touchEmu ? 'Touch: mouse acts like a finger' : 'Touch off: normal mouse', 1800);
+    scheduleLayout();
   };
+  $('.set-bars').onchange = (e) => setUi({ bars: e.target.checked });
+  $('.set-kbd').onchange = (e) => {
+    setUi({ keyboard: e.target.checked });
+    if (!e.target.checked) views.forEach((v) => hideKeyboard(v));
+  };
+  $('.set-safe').onchange = (e) => setUi({ guides: e.target.checked });
   $('.shot').onclick = () => {
     updateShotRows();
     togglePop('.shot-pop');

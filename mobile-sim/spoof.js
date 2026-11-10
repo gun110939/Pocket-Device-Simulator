@@ -239,6 +239,83 @@
     });
   }
 
+  // ---- safe area: env(safe-area-inset-*) for pages that opt in with viewport-fit=cover ----
+  const SAFE_RE = /env\(\s*safe-area-inset-(top|right|bottom|left)\s*(?:,[^)]*)?\)/g;
+  const applySafeArea = () => {
+    const meta = document.querySelector('meta[name="viewport"]');
+    const cover = !!meta && /viewport-fit\s*=\s*cover/i.test(meta.content || '');
+    post({ type: 'viewport', cover, bg: getComputedStyle(document.documentElement).backgroundColor });
+    let out = document.getElementById('__msim_safe');
+    const sa = c.safe || { t: 0, r: 0, b: 0, l: 0 };
+    if (!cover || !(sa.t || sa.r || sa.b || sa.l)) {
+      if (out) out.textContent = '';
+      return;
+    }
+    const vals = { top: sa.t, right: sa.r, bottom: sa.b, left: sa.l };
+    const fix = (txt) => txt.replace(SAFE_RE, (_, side) => vals[side] + 'px');
+    const rules = [];
+    const walk = (list, wrap) => {
+      for (const r of list) {
+        if (r.cssRules && r.media) walk(r.cssRules, (t) => wrap(`@media ${r.media.mediaText}{${t}}`));
+        else if (r.cssRules && r.conditionText) walk(r.cssRules, (t) => wrap(`@supports ${r.conditionText}{${t}}`));
+        else if (r.style && r.selectorText && r.cssText.includes('safe-area-inset')) {
+          // only the declarations that use env(), marked important so they win over the original
+          const decls = r.style.cssText.split(/;(?![^(]*\))/).filter((x) => x.includes('safe-area-inset'));
+          rules.push(wrap(`${r.selectorText}{${decls.map((x) => fix(x).trim() + ' !important').join(';')}}`));
+        }
+      }
+    };
+    for (const sheet of document.styleSheets) {
+      if (sheet.ownerNode && sheet.ownerNode.id === '__msim_safe') continue;
+      try {
+        walk(sheet.cssRules, (t) => t);
+      } catch {} // cross-origin sheets cannot be read
+    }
+    for (const el of document.querySelectorAll('[style*="safe-area-inset"]')) el.style.cssText = fix(el.style.cssText);
+    if (!out) {
+      out = document.createElement('style');
+      out.id = '__msim_safe';
+      (document.head || document.documentElement).appendChild(out);
+    }
+    out.textContent = rules.join('\n');
+  };
+  addEventListener('DOMContentLoaded', applySafeArea);
+  addEventListener('load', applySafeArea);
+
+  // ---- virtual keyboard: tell the shell when a text field gets focus ----
+  const NON_TEXT = /^(checkbox|radio|range|color|file|submit|button|reset|image|hidden)$/i;
+  const isEditable = (el) => !!el && (el.isContentEditable || el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !NON_TEXT.test(el.type)));
+  const kindOf = (el) => {
+    const t = ((el.getAttribute && (el.getAttribute('inputmode') || el.type)) || 'text').toLowerCase();
+    return /^(number|numeric|decimal|tel)$/.test(t) ? 'num' : t === 'email' ? 'email' : t === 'url' ? 'url' : 'text';
+  };
+  document.addEventListener('focusin', (e) => isEditable(e.target) && post({ type: 'kbd', show: true, kind: kindOf(e.target) }), true);
+  document.addEventListener('focusout', () => setTimeout(() => !isEditable(document.activeElement) && post({ type: 'kbd', show: false }), 60), true);
+  // While the keyboard is up, the visual viewport is shorter, like on a phone.
+  let kbH = 0;
+  const vvHeight = Object.getOwnPropertyDescriptor(VisualViewport.prototype, 'height');
+  if (vvHeight && vvHeight.get) {
+    def(VisualViewport.prototype, 'height', function () {
+      return Math.max(0, vvHeight.get.call(this) - kbH);
+    });
+  }
+  const typeKey = (key) => {
+    const el = document.activeElement;
+    if (!isEditable(el)) return;
+    if (key === 'Backspace') document.execCommand('delete');
+    else if (key === 'Enter') {
+      const down = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true });
+      if (!el.dispatchEvent(down)) return;
+      if (el.tagName === 'TEXTAREA' || el.isContentEditable) document.execCommand('insertText', false, '\n');
+      else if (el.form) el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit();
+      el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+    } else {
+      el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      document.execCommand('insertText', false, key);
+      el.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+    }
+  };
+
   // Sync channel with the simulator shell (the parent window).
   const parentWin = window.parent;
   const post = (msg) => {
@@ -287,7 +364,20 @@
   );
   addEventListener('message', (e) => {
     if (e.source !== parentWin || !e.data || e.data.msim !== true) return;
-    if (e.data.type === 'config') applyConfig(e.data.cfg);
+    if (e.data.type === 'config') {
+      applyConfig(e.data.cfg);
+      applySafeArea();
+    }
+    if (e.data.type === 'key') typeKey(e.data.key);
+    if (e.data.type === 'kbd') {
+      kbH = e.data.h || 0;
+      if (window.visualViewport) visualViewport.dispatchEvent(new Event('resize'));
+      const el = document.activeElement;
+      if (kbH && el && el.getBoundingClientRect) {
+        const r = el.getBoundingClientRect();
+        if (r.bottom > innerHeight - kbH - 8) scrollBy({ top: r.bottom - (innerHeight - kbH) + 24, behavior: 'smooth' });
+      }
+    }
     if (e.data.type === 'scrollTo') {
       const el = document.scrollingElement || document.documentElement;
       suppressUntil = performance.now() + 150;
