@@ -90,6 +90,7 @@
     <div class="grp">
       <button class="btn add" title="Add another device to this tab">${I('plus')}Device</button>
       <button class="btn sync" title="Sync options">${I('sync')}Sync</button>
+      <button class="btn touch" title="Mouse acts like a finger on touch devices (drag to scroll, touch events)">${I('hand')}Touch</button>
       <select class="zoom" title="Zoom">
         <option value="fit">Fit</option><option value="1">100%</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.33">33%</option>
       </select>
@@ -210,7 +211,7 @@
   const cfgFor = (inst) => {
     const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
-      landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua) };
+      landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false };
   };
 
   const PHONE_STYLES = ['island', 'notch', 'punch', 'classic', 'cover'];
@@ -1229,6 +1230,21 @@
   $('.close-panel').onclick = () => $('.panel').classList.remove('show');
   $('.search').addEventListener('input', renderPicker);
   $('.sync').onclick = () => togglePop('.sync-pop');
+  const touchBtn = $('.touch');
+  touchBtn.classList.toggle('on', state.touchEmu !== false);
+  touchBtn.onclick = async () => {
+    state.touchEmu = state.touchEmu === false;
+    touchBtn.classList.toggle('on', state.touchEmu);
+    await save({ touchEmu: state.touchEmu });
+    // the setting is read when a page starts, so rebuild the viewports
+    views.forEach((v, i) => {
+      try {
+        v.iframe.contentWindow.name = 'msim:' + encodeURIComponent(JSON.stringify(cfgFor(state.devices[i])));
+      } catch {}
+    });
+    reloadAll();
+    toast(state.touchEmu ? 'Touch: mouse acts like a finger' : 'Touch off: normal mouse', 1800);
+  };
   $('.shot').onclick = () => {
     updateShotRows();
     togglePop('.shot-pop');

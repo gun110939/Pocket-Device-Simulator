@@ -130,6 +130,115 @@
   document.addEventListener('click', (e) => retarget(e.target instanceof Element ? e.target.closest('a[href], area[href]') : null), true);
   document.addEventListener('submit', (e) => retarget(e.target instanceof HTMLFormElement ? e.target : null), true);
 
+  // ---- touch emulation: the mouse acts like a finger ----
+  // The page receives touchstart/move/end instead of mouse events; dragging scrolls with
+  // momentum; a tap still produces the click a phone would send.
+  if (c.touch && c.touchEmu !== false) {
+    const cursor = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30"><circle cx="15" cy="15" r="11" fill="rgba(80,80,80,.35)" stroke="rgba(255,255,255,.9)" stroke-width="2"/></svg>');
+    const cur = document.createElement('style');
+    cur.textContent = `html, html * { cursor: url("data:image/svg+xml,${cursor}") 15 15, pointer !important; }`;
+    (document.head || document.documentElement).appendChild(cur);
+
+    const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"]';
+    let t = null; // the current touch
+    let blockClick = false;
+    let fling = 0;
+
+    const fire = (type, target, x, y) => {
+      const touch = new Touch({ identifier: 1, target, clientX: x, clientY: y, pageX: x + scrollX, pageY: y + scrollY,
+        screenX: x, screenY: y, radiusX: 11, radiusY: 11, force: 1 });
+      const ended = type === 'touchend' || type === 'touchcancel';
+      return target.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, composed: true,
+        touches: ended ? [] : [touch], targetTouches: ended ? [] : [touch], changedTouches: [touch] }));
+    };
+    const canScroll = (el, axis) => {
+      const st = getComputedStyle(el);
+      const ov = axis === 'y' ? st.overflowY : st.overflowX;
+      return /(auto|scroll)/.test(ov) && (axis === 'y' ? el.scrollHeight > el.clientHeight : el.scrollWidth > el.clientWidth);
+    };
+    const scrollerFor = (el, axis) => {
+      for (let n = el; n && n !== document.documentElement && n !== document.body; n = n.parentElement) if (n instanceof Element && canScroll(n, axis)) return n;
+      return document.scrollingElement || document.documentElement;
+    };
+    const swallow = (e) => {
+      e.stopImmediatePropagation();
+    };
+
+    addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || !e.isTrusted) return;
+      cancelAnimationFrame(fling);
+      const target = e.target instanceof Element ? e.target : document.documentElement;
+      const editable = target.closest(EDITABLE);
+      t = { target, editable, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, moved: false, scroller: null,
+        vx: 0, vy: 0, time: performance.now(), prevented: !fire('touchstart', target, e.clientX, e.clientY) };
+      if (!editable) e.preventDefault(); // no text selection or image drag while swiping
+      swallow(e);
+    }, true);
+
+    addEventListener('mousemove', (e) => {
+      if (!e.isTrusted) return;
+      swallow(e); // phones have no hover-move events
+      if (!t || !(e.buttons & 1)) return;
+      const dx = e.clientX - t.x, dy = e.clientY - t.y;
+      if (!t.moved && Math.hypot(e.clientX - t.x0, e.clientY - t.y0) > 6) t.moved = true;
+      const ok = fire('touchmove', t.target, e.clientX, e.clientY);
+      if (t.moved && ok && !t.prevented && !t.editable) {
+        if (!t.scroller) t.scroller = scrollerFor(t.target, Math.abs(e.clientY - t.y0) >= Math.abs(e.clientX - t.x0) ? 'y' : 'x');
+        t.scroller.scrollBy(-dx, -dy);
+        const now = performance.now(), dt = Math.max(1, now - t.time);
+        t.vx = 0.8 * (-dx / dt) + 0.2 * t.vx;
+        t.vy = 0.8 * (-dy / dt) + 0.2 * t.vy;
+        t.time = now;
+      }
+      t.x = e.clientX;
+      t.y = e.clientY;
+    }, true);
+
+    addEventListener('mouseup', (e) => {
+      if (e.button !== 0 || !e.isTrusted || !t) return;
+      swallow(e);
+      const done = t;
+      t = null;
+      const ok = fire('touchend', done.target, e.clientX, e.clientY);
+      if (done.moved || !ok) {
+        blockClick = true; // a swipe, or the page cancelled the tap
+        setTimeout(() => (blockClick = false), 0);
+      } else {
+        // compatibility mouse events a phone sends after a tap
+        for (const type of ['mousedown', 'mouseup']) {
+          done.target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, composed: true, clientX: e.clientX, clientY: e.clientY, button: 0, buttons: type === 'mousedown' ? 1 : 0 }));
+        }
+        if (done.editable && done.editable.focus) done.editable.focus();
+      }
+      // momentum
+      if (done.moved && done.scroller && !done.prevented && performance.now() - done.time < 80) {
+        let vx = done.vx * 16, vy = done.vy * 16;
+        const step = () => {
+          vx *= 0.94;
+          vy *= 0.94;
+          if (Math.abs(vx) < 0.4 && Math.abs(vy) < 0.4) return;
+          done.scroller.scrollBy(vx, vy);
+          fling = requestAnimationFrame(step);
+        };
+        fling = requestAnimationFrame(step);
+      }
+    }, true);
+
+    addEventListener('click', (e) => {
+      if (blockClick && e.isTrusted) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    }, true);
+    // A drag that leaves the frame ends the touch.
+    addEventListener('mouseleave', () => {
+      if (t) {
+        fire('touchcancel', t.target, t.x, t.y);
+        t = null;
+      }
+    });
+  }
+
   // Sync channel with the simulator shell (the parent window).
   const parentWin = window.parent;
   const post = (msg) => {
