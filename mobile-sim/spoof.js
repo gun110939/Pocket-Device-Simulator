@@ -117,7 +117,7 @@
   };
 
   // Look like a top-level page.
-  def(window, 'frameElement', null);
+  def(window, 'frameElement', () => null);
 
   // Links and forms aimed at _top/_parent open in the viewport itself; the sandbox would
   // otherwise silently drop them.
