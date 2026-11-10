@@ -1001,7 +1001,20 @@
     } catch {}
   }
 
+  // Loop breaker: if sync keeps firing, the page is fighting it; pause for a while.
+  const syncLog = [];
+  let syncPausedUntil = 0;
   function navigateOthers(from, url) {
+    const now = performance.now();
+    if (now < syncPausedUntil) return;
+    syncLog.push(now);
+    while (syncLog.length && now - syncLog[0] > 10000) syncLog.shift();
+    if (syncLog.length > 6) {
+      syncPausedUntil = now + 15000;
+      syncLog.length = 0;
+      toast(T('Navigation sync paused: this page keeps changing its address'), 3500);
+      return;
+    }
     views.forEach((v, j) => {
       if (j === from || v.lastUrl === url) return;
       v.lastUrl = url;
@@ -1014,8 +1027,10 @@
   window.addEventListener('message', (e) => {
     const data = e.data;
     if (!data || data.msim !== true) return;
-    const from = views.findIndex((v) => v.iframe.contentWindow === e.source);
-    if (from < 0) return;
+    let from = views.findIndex((v) => v.iframe.contentWindow === e.source);
+    // While a frame is navigating away, event.source may no longer match its iframe; the device id does.
+    if (from < 0 && data.sid) from = state.devices.findIndex((d) => d.sid === data.sid);
+    if (from < 0 || !views[from]) return;
     if (data.type === 'loading') {
       setLoading(views[from], true);
       hideKeyboard(views[from], true);
@@ -1039,18 +1054,29 @@
       if (changed && state.devices[from].landscape) shapeView(from);
       return;
     }
+    if (data.type === 'intent') {
+      // the user started a navigation in this device: its next address change leads the others
+      views[from].leadUntil = performance.now() + 10000;
+      views[from].followUntil = 0; // a user action ends "following" right away
+      return;
+    }
     if (data.type === 'nav') {
       const v = views[from];
+      if (data.user) v.followUntil = 0;
       const followed = performance.now() < v.followUntil;
+      const leads = !followed && (data.user || performance.now() < (v.leadUntil || 0));
       v.lastUrl = data.url;
       updateHost(v);
       if (from === state.active) {
         setUrl(data.url);
         if (data.title) document.title = '📱 ' + data.title;
       }
-      // A device that is only following another one must not lead (mobile/desktop redirects
-      // could otherwise bounce between devices).
-      if (!followed && state.sync.nav && views.length > 1) navigateOthers(from, data.url);
+      // Only navigations the user made lead; a following device never leads, and each user action
+      // leads once (later address changes from redirects or replaceState stay local).
+      if (leads && state.sync.nav && views.length > 1) {
+        v.leadUntil = 0;
+        navigateOthers(from, data.url);
+      }
     } else if (data.type === 'scroll' && state.sync.scroll && views.length > 1) {
       views.forEach((v, j) => {
         if (j !== from) v.iframe.contentWindow.postMessage({ msim: true, type: 'scrollTo', rx: data.rx, ry: data.ry }, '*');
@@ -1552,6 +1578,8 @@
   };
   $('.back').onclick = () => {
     try {
+      views[state.active].leadUntil = performance.now() + 10000; // others follow the back step
+      views[state.active].followUntil = 0;
       views[state.active].iframe.contentWindow.history.back();
     } catch {}
   };

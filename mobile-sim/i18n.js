@@ -137,4 +137,5 @@ self.MSIM_TH = {
   'Applies to the whole tab through the Chrome debugger, so page CSS sees it too.': 'ใช้กับทั้งแท็บผ่าน Chrome debugger ทำให้ CSS ของหน้าเว็บเห็นค่าเหล่านี้ด้วย',
   'Could not apply:': 'ใช้ค่าไม่สำเร็จ:',
   'Accurate mode off': 'ปิดโหมดแม่นยำแล้ว',
+  'Navigation sync paused: this page keeps changing its address': 'พักการซิงก์การนำทางชั่วคราว: หน้านี้เปลี่ยน URL ตัวเองตลอด',
 };

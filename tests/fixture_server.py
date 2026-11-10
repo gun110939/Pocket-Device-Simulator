@@ -9,6 +9,14 @@ class H(http.server.BaseHTTPRequestHandler):
         dest=self.headers.get('Sec-Fetch-Dest','')
         p=self.path
         if p.startswith('/slow'): time.sleep(2.5)
+        if p.startswith('/slowimg'):
+            time.sleep(5)
+            self.send_response(200); self.send_header('Content-Type','image/svg+xml'); self.end_headers()
+            self.wfile.write(b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'); return
+        if p.startswith('/loop'):
+            # like many real sites: rewrites its own URL on every load (tracking id) and finishes loading slowly
+            self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()
+            self.wfile.write(b'<!doctype html><meta name=viewport content="width=device-width"><h1>LOOP</h1><img src="/slowimg"><script>history.replaceState(null, "", "/loop?visit=" + Math.random().toString(36).slice(2, 8));</script>'); return
         if p.startswith('/dark'):
             self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()
             self.wfile.write(b'<!doctype html><style>body{background:#fff}@media (prefers-color-scheme: dark){body{background:rgb(1,2,3)}}@media (prefers-reduced-motion: reduce){body{color:rgb(9,9,9)}}</style><body>dark test</body>'); return

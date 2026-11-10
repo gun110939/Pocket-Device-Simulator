@@ -139,6 +139,33 @@ const suites = {
     assert.equal(await b.ev(`${F(1)}.localStorage.getItem('k')`), null, 'storage is per device');
   },
 
+  async navsync(b) {
+    await b.enable();
+    await pickDevice(b, 'Pixel 9', true);
+    // a page that rewrites its own URL and loads slowly must not make the devices reload each other
+    await b.ev(`(()=>{const u=${R}.querySelector('.url'); u.value=${JSON.stringify(SITE + '/loop')}; u.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))})()`);
+    await sleep(1500);
+    await b.ev(`(()=>{window.__loads=[0,0]; [...${R}.querySelectorAll('iframe')].forEach((f,i)=>f.addEventListener('load',()=>window.__loads[i]++)); return 1})()`);
+    await sleep(14000);
+    const loads = await b.ev('window.__loads');
+    assert.ok(loads[0] <= 1 && loads[1] <= 1, `no reload loop (loads ${JSON.stringify(loads)})`);
+    // a real click in one device still leads the others
+    await b.ev(`(()=>{const u=${R}.querySelector('.url'); u.value=${JSON.stringify(SITE + '/')}; u.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter'}))})()`);
+    await sleep(2500);
+    await b.ev(`(()=>{window.__m=[]; addEventListener('message', e=>{ if (e.data && e.data.msim && e.data.type!=='scroll') { const i=[...${R}.querySelectorAll('iframe')].findIndex(f=>f.contentWindow===e.source); window.__m.push(i+':'+e.data.type+(e.data.url?' '+e.data.url.slice(21):'')) } }); return 1})()`);
+    const pt = await b.ev(`(()=>{const f=${R}.querySelector('iframe'); const fr=f.getBoundingClientRect(); const s=fr.width/f.contentWindow.innerWidth; const r=f.contentDocument.getElementById('top').getBoundingClientRect(); return [fr.left+(r.left+r.width/2)*s, fr.top+(r.top+r.height/2)*s]})()`);
+    await b.mouse('mousePressed', pt[0], pt[1], 1);
+    await sleep(60);
+    await b.mouse('mouseReleased', pt[0], pt[1]);
+    for (let i = 0; i < 20 && (await b.ev(`${F(1)}.location.pathname`)) !== '/page2'; i++) await sleep(300);
+    const after = [await b.ev(`${F(0)}.location.pathname`), await b.ev(`${F(1)}.location.pathname`)];
+    assert.deepEqual(after, ['/page2', '/page2'], `the other device follows a user click (got ${after}; ${JSON.stringify(await b.ev('window.__m'))}; toast=${await b.ev(`${R}.querySelector('.toast span').textContent`)})`);
+    await clickUI(b, '.back');
+    for (let i = 0; i < 20 && (await b.ev(`${F(1)}.location.pathname`)) !== '/'; i++) await sleep(300);
+    assert.equal(await b.ev(`${F(0)}.location.pathname`), '/', 'back in the active device');
+    assert.equal(await b.ev(`${F(1)}.location.pathname`), '/', 'the other device follows back');
+  },
+
   async emulation(b) {
     await b.enable();
     await clickUI(b, '.settings');
@@ -152,7 +179,7 @@ const suites = {
   },
 };
 
-const START = { core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
+const START = { navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
 
 const server = spawn('python3', ['-I', join(ROOT, 'tests/fixture_server.py'), '8765'], { stdio: 'ignore' });
 await sleep(800);

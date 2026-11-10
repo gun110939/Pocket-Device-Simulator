@@ -476,10 +476,19 @@
   const parentWin = window.parent;
   const post = (msg) => {
     try {
-      parentWin.postMessage({ msim: true, ...msg }, '*');
+      parentWin.postMessage({ msim: true, sid: c.sid, ...msg }, '*');
     } catch {}
   };
-  const reportUrl = () => post({ type: 'nav', url: location.href, title: document.title });
+  // Navigation sync only follows what the user did in this device. URL changes the page makes on
+  // its own (replaceState, script redirects) must not drive the other devices, or they reload each
+  // other forever.
+  let lastInput = -1e9;
+  const markInput = (e) => {
+    if (e.isTrusted) lastInput = performance.now();
+  };
+  for (const t of ['pointerdown', 'mousedown', 'keydown', 'touchstart']) addEventListener(t, markInput, true);
+  const byUser = () => performance.now() - lastInput < 1500;
+  const reportUrl = () => post({ type: 'nav', url: location.href, title: document.title, user: byUser() });
   for (const fn of ['pushState', 'replaceState']) {
     const orig = history[fn];
     history[fn] = function (...args) {
@@ -496,6 +505,7 @@
   // (the Navigation API fires at the start; pagehide is the fallback).
   if (window.navigation) {
     navigation.addEventListener('navigate', (e) => {
+      if (e.userInitiated || byUser()) post({ type: 'intent', url: e.destination.url });
       if (!e.destination.sameDocument && !e.downloadRequest) post({ type: 'loading' });
     });
   }
