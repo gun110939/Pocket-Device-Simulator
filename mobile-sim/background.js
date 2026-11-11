@@ -1,4 +1,4 @@
-importScripts('devices.js', 'debug.js', 'sessions.js');
+importScripts('devices.js', 'debug.js');
 
 // How it works
 // 1. Turning the simulator on for a tab installs tab-scoped network rules, then reloads the tab.
@@ -72,7 +72,6 @@ async function restoreKeptTabs() {
     const next = { ...state, ruleBase };
     await setState(tabId, next);
     await installRules(tabId, ruleBase, next.ua || deviceById().ua, next.lang);
-    if (next.isolate) await isolate(tabId, next, true).catch(() => setState(tabId, { ...next, isolate: false }));
     if (next.emu && !Emulation.isDefault(next.emu)) await Emulation.apply(tabId, next.emu).catch(() => {});
     await setBadge(tabId, true);
     await chrome.tabs.reload(tabId, { bypassCache: true }).catch(() => {});
@@ -153,27 +152,6 @@ Debug.onLost(async (tabId) => {
   }
 });
 
-// Separate sessions: keep Set-Cookie away from the browser's shared jar for this tab
-// (sessions.js reads it from the raw response first).
-async function setCookieRule(tabId, base, on) {
-  const id = base + 4;
-  await chrome.declarativeNetRequest.updateSessionRules({
-    removeRuleIds: [id],
-    addRules: on ? [{ id, priority: 2, action: { type: 'modifyHeaders', responseHeaders: [{ header: 'set-cookie', operation: 'remove' }] },
-      condition: { tabIds: [tabId], resourceTypes: ALL_TYPES.filter((t) => t !== 'main_frame') } }] : [],
-  });
-}
-
-async function isolate(tabId, state, on) {
-  if (on) {
-    await Sessions.start(tabId);
-    await setCookieRule(tabId, state.ruleBase, true);
-  } else {
-    await setCookieRule(tabId, state.ruleBase, false);
-    await Sessions.stop(tabId, { clear: true });
-  }
-}
-
 async function removeRules(state) {
   if (!state || !state.ruleBase) return;
   await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: ruleIds(state.ruleBase) });
@@ -208,7 +186,6 @@ async function enable(tab) {
 
 async function disable(tabId) {
   const state = await getState(tabId);
-  await Sessions.stop(tabId, { clear: true });
   if (state && state.emu) await Emulation.apply(tabId, null).catch(() => {});
   await clearState(tabId);
   await removeRules(state);
@@ -305,17 +282,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
       case 'exit':
         await disable(tabId);
         return reply({ ok: true });
-      case 'isolate': {
-        try {
-          await isolate(tabId, state, !!msg.on);
-          await setState(tabId, { ...state, isolate: !!msg.on });
-          return reply({ ok: true });
-        } catch (e) {
-          await setCookieRule(tabId, state.ruleBase, false).catch(() => {});
-          await setState(tabId, { ...state, isolate: false });
-          return reply({ error: String((e && e.message) || e) });
-        }
-      }
       case 'emulate': {
         try {
           await Emulation.apply(tabId, msg.emu);
@@ -325,12 +291,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
           return reply({ error: String((e && e.message) || e) });
         }
       }
-      case 'setcookie':
-        Sessions.setFromScript(tabId, msg.sid, msg.url, msg.value);
-        return reply({ ok: true });
-      case 'clearSession':
-        Sessions.clearDevice(tabId, msg.sid);
-        return reply({ ok: true });
       default:
         return reply({ error: 'unknown message' });
     }
@@ -341,7 +301,6 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   const state = await getActiveState(tabId);
   if (!state) return;
-  await Sessions.stop(tabId, { clear: true });
   await clearState(tabId);
   await removeRules(state);
 });

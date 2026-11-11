@@ -134,8 +134,6 @@
     <div class="row2"><span>${T('Edge-to-edge screen (like DevTools / app)')}</span><label class="toggle"><input type="checkbox" class="set-edge"><span></span></label></div>
     <div class="row2"><span>${T("Virtual keyboard")}</span><label class="toggle"><input type="checkbox" class="set-kbd"><span></span></label></div>
     <div class="row2"><span>${T("Show safe-area guides")}</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
-    <div class="row2"><span>${T('Separate sessions per device')}</span><label class="toggle"><input type="checkbox" class="set-iso"><span></span></label></div>
-    <div class="note">${T('Each device gets its own cookies and storage, so you can sign in as different users side by side. Chrome shows a "started debugging" bar while this is on.')}</div>
     <h4 class="sub">${T('Accurate mode')}</h4>
     <div class="row2"><span>${T('Colour scheme')}</span><select class="emu-scheme"><option value="default">${T('Default')}</option><option value="light">${T('Light')}</option><option value="dark">${T('Dark')}</option></select></div>
     <div class="row2"><span>${T('Reduced motion')}</span><label class="toggle"><input type="checkbox" class="emu-motion"><span></span></label></div>
@@ -269,7 +267,7 @@
     const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
       landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false, safe: safeInsets(inst, d),
-      lang: prefs.lang || '', geo: prefs.geo || null, sid: inst.sid, isolate: !!state.isolate };
+      lang: prefs.lang || '', geo: prefs.geo || null, sid: inst.sid };
   };
 
   const PHONE_STYLES = ['island', 'notch', 'punch', 'classic', 'cover'];
@@ -491,7 +489,6 @@
     const tags = [];
     if (state.devices.length > 1 && i === state.primary) tags.push('<span class="badge ua" title="User-Agent header comes from this device">UA</span>');
     if (base.estimate) tags.push('<span class="badge" title="Unreleased or rumoured specs">est.</span>');
-    if (state.isolate) tags.push(`<span class="badge sess" title="${T('Own cookies and storage')}">S${i + 1}</span>`);
     v.caption.innerHTML = `
       <button class="name" title="${T("Change device")}">${escapeHtml(base.name)} ▼</button>
       ${tags.join('')}
@@ -1055,7 +1052,7 @@
   // Loop breaker: if sync keeps firing, the page is fighting it; pause for a while.
   const syncLog = [];
   let syncPausedUntil = 0;
-  function navigateOthers(from, url) {
+  function navigateOthers(from, url, spa) {
     const now = performance.now();
     if (now < syncPausedUntil) return;
     syncLog.push(now);
@@ -1068,8 +1065,21 @@
     }
     views.forEach((v, j) => {
       if (j === from || v.lastUrl === url) return;
+      const same = (() => {
+        try {
+          return new URL(v.lastUrl).origin === new URL(url).origin;
+        } catch {
+          return false;
+        }
+      })();
       v.lastUrl = url;
       v.followUntil = performance.now() + 4000;
+      // In-app route change: let the page's router follow without a reload.
+      if (spa && same) {
+        try {
+          return v.iframe.contentWindow.postMessage({ msim: true, type: 'go', url }, '*');
+        } catch {}
+      }
       setLoading(v, true);
       v.iframe.src = url;
     });
@@ -1091,10 +1101,6 @@
       const v = views[from];
       if (data.show && ui().keyboard && devOf(state.devices[from]).touch) showKeyboard(v, from, data.kind);
       else if (!data.show) hideKeyboard(v);
-      return;
-    }
-    if (data.type === 'setcookie') {
-      if (state.isolate) send({ type: 'setcookie', sid: state.devices[from].sid, url: data.url, value: data.value });
       return;
     }
     if (data.type === 'viewport') {
@@ -1127,7 +1133,7 @@
       // leads once (later address changes from redirects or replaceState stay local).
       if (leads && state.sync.nav && views.length > 1) {
         v.leadUntil = 0;
-        navigateOthers(from, data.url);
+        navigateOthers(from, data.url, data.spa);
       }
     } else if (data.type === 'scroll' && state.sync.scroll && views.length > 1) {
       views.forEach((v, j) => {
@@ -1593,22 +1599,7 @@
     toast(label || T('Accurate mode off'), 1800);
   };
   for (const c of ['.emu-scheme', '.emu-motion', '.emu-net', '.emu-cpu']) $(c).onchange = applyEmu;
-  $('.set-iso').checked = !!state.isolate;
-  $('.set-iso').onchange = async (e) => {
-    const on = e.target.checked;
-    progress(on ? T('Starting separate sessions…') : T('Back to one shared session…'));
-    const res = await send({ type: 'isolate', on });
-    progress(null);
-    if (!res || res.error) {
-      e.target.checked = false;
-      return toast(T('Could not start separate sessions:') + ' ' + ((res && res.error) || ''), 4000);
-    }
-    state.isolate = on;
-    renameAll();
-    reloadAll();
-    refreshCaptions();
-    toast(on ? T('Each device now has its own session') : T('Devices share one session again'), 2200);
-  };
+
   $('.shot').onclick = () => {
     updateShotRows();
     togglePop('.shot-pop');
@@ -1642,33 +1633,17 @@
   urlInput.addEventListener('focus', () => urlInput.select());
   $('.exit').onclick = () => send({ type: 'exit' });
   window.addEventListener('resize', scheduleLayout);
-  // messages from the background: cookie updates for a device, debugger bar closed
+  // messages from the background: the debugger bar was closed
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg) return;
-      if (msg.type === 'jar') {
-        views.forEach((v, i) => {
-          if (state.devices[i] && state.devices[i].sid === msg.sid) {
-            try {
-              v.iframe.contentWindow.postMessage({ msim: true, type: 'jar', cookies: msg.cookies }, '*');
-            } catch {}
-          }
-        });
-      } else if (msg.type === 'emulation-off') {
+      if (msg.type === 'emulation-off') {
         state.emu = null;
         $('.emu-scheme').value = 'default';
         $('.emu-motion').checked = false;
         $('.emu-net').value = 'none';
         $('.emu-cpu').value = '1';
         toast(T('Accurate mode off'), 2200);
-      } else if (msg.type === 'isolation-off' && state.isolate) {
-        state.isolate = false;
-        $('.set-iso').checked = false;
-        save({ isolate: false });
-        renameAll();
-        reloadAll();
-        refreshCaptions();
-        toast(T('Separate sessions turned off'), 2600);
       }
     });
   } catch {}

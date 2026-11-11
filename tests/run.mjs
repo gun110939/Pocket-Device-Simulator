@@ -119,24 +119,19 @@ const suites = {
     assert.equal(await b.ev(`new Promise(r=>${F()}.navigator.geolocation.getCurrentPosition(p=>r(p.coords.latitude)))`), 35.6762);
   },
 
-  async sessions(b) {
+  async spa(b) {
     await b.enable();
     await pickDevice(b, 'Pixel 9', true);
-    await setUI(b, '.sync-nav', false);
-    await clickUI(b, '.settings');
-    await sleep(300);
-    await setUI(b, '.set-iso', true);
-    await sleep(4000);
-    const go = async (n, url) => { await b.ev(`${R}.querySelectorAll('iframe')[${n}].src=${JSON.stringify(url)}`); await sleep(1500); return b.ev(`${F(n)}.document.body.innerText`); };
-    await go(0, SITE + '/setck?user=alice');
-    await go(1, SITE + '/setck?user=bob');
-    assert.match(await go(0, SITE + '/setck?check=1'), /user=alice/);
-    assert.doesNotMatch(await go(0, SITE + '/setck?check=2'), /user=bob/, 'device A never sees B');
-    assert.match(await go(1, SITE + '/setck?check=3'), /user=bob/);
-    assert.match(await go(0, SITE + '/redir'), /session=fromredirect/, 'cookie set on a redirect is kept');
-    await go(0, SITE + '/'); await go(1, SITE + '/');
-    await b.ev(`${F(0)}.localStorage.setItem('k','A')`);
-    assert.equal(await b.ev(`${F(1)}.localStorage.getItem('k')`), null, 'storage is per device');
+    await sleep(1000);
+    await b.ev(`(()=>{window.__loads=[0,0]; [...${R}.querySelectorAll('iframe')].forEach((f,i)=>f.addEventListener('load',()=>window.__loads[i]++)); return 1})()`);
+    const pt = await b.ev(`(()=>{const f=${R}.querySelector('iframe'); const fr=f.getBoundingClientRect(); const s=fr.width/f.contentWindow.innerWidth; const r=f.contentDocument.getElementById('l-more').getBoundingClientRect(); return [fr.left+(r.left+r.width/2)*s, fr.top+(r.top+r.height/2)*s]})()`);
+    await b.mouse('mousePressed', pt[0], pt[1], 1);
+    await sleep(60);
+    await b.mouse('mouseReleased', pt[0], pt[1]);
+    for (let i = 0; i < 15 && (await b.ev(`${F(1)}.document.getElementById('view').textContent`)) !== 'route:/spa/more'; i++) await sleep(200);
+    assert.equal(await b.ev(`${F(1)}.document.getElementById('view').textContent`), 'route:/spa/more', 'the other device changes screen');
+    assert.deepEqual(await b.ev('window.__loads'), [0, 0], 'no device reloaded');
+    assert.equal(await b.ev(`${F(1)}.__boots`), 1, 'the app was not restarted');
   },
 
   async embed(b) {
@@ -206,7 +201,7 @@ const suites = {
   },
 };
 
-const START = { embed: '/embed', edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
+const START = { spa: '/spa/home', embed: '/embed', edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', emulation: '/dark' };
 
 const server = spawn('python3', ['-I', join(ROOT, 'tests/fixture_server.py'), '8765'], { stdio: 'ignore' });
 await sleep(800);

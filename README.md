@@ -66,19 +66,19 @@ Regenerate these images with `node docs/screenshots.mjs`.
   screen and the status bar floats over it (switch it off in Settings to put the status bar above the page).
 - **Browser bars**, **safe-area insets** (`env(safe-area-inset-*)` with `viewport-fit=cover`) and a
   **virtual keyboard** (iOS / Android looks, numeric pad) that types into the page.
-- **Several devices side by side** with synced scrolling and navigation.
+- **Several devices side by side** with synced scrolling and navigation (follows what you tap;
+  single-page apps change screen without reloading).
 - **Screenshots**: transparent device PNG, device on a colour, screen only (optionally rounded),
   full page (stitched), all devices in one image, or one PNG per device in a ZIP.
 - **Screen recording** cropped to the device, with optional webcam bubble and microphone.
 - **Page language** (navigator, `Accept-Language`, `Intl` default locale) and **GPS** location.
-- **Separate sessions per device** (opt-in): own cookies, `document.cookie`, Web Storage,
-  IndexedDB and Cache Storage, so different accounts can be signed in side by side.
 - **Accurate mode** (opt-in): dark/light `prefers-color-scheme` and reduced motion for page CSS,
   network throttling (Fast 4G, Slow 4G, 3G, Offline) and CPU slowdown.
 - Saved device sets, loading indicators, recovery after the extension is reloaded.
 
-Separate sessions and accurate mode use the `chrome.debugger` API, so Chrome shows its
-"started debugging this browser" bar while they are on.
+Accurate mode uses the `chrome.debugger` API, so Chrome shows its
+"started debugging this browser" bar while it is on. Devices in one tab share cookies and storage;
+use an Incognito window or another Chrome profile to sign in as a second user.
 
 ## How it works
 
@@ -86,14 +86,14 @@ Separate sessions and accurate mode use the `chrome.debugger` API, so Chrome sho
 X-Frame-Options/CSP for sub-frames, CSP that stops the original page's scripts in the top frame)
 and reloads the tab. `shell.js` replaces the top document with the simulator UI and loads the page
 again in same-origin iframes, one per device, so cookies stay first-party. `spoof.js` runs in each
-device frame's main world at `document_start`. `sessions.js` and `debug.js` implement the opt-in
-debugger features. `capture.js` handles screenshots, ZIP export and recording.
+device frame's main world at `document_start`. `debug.js` implements the opt-in
+debugger feature. `capture.js` handles screenshots, ZIP export and recording.
 
 ## Development
 
 ```sh
 node tests/run.mjs            # all end-to-end suites (needs Python 3 and Chrome for Testing / Chromium)
-node tests/run.mjs sessions   # one suite
+node tests/run.mjs spa        # one suite
 ./scripts/pack.sh             # dist/pocket-device-simulator-<version>.zip
 ```
 

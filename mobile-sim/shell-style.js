@@ -271,7 +271,6 @@ iframe { flex: 1; width: 100%; min-height: 0; border: 0; background: #fff; displ
 .caption .fin i { display: block; width: 12px; height: 12px; box-shadow: 0 0 0 2px var(--g0); }
 .badge { font: 7px/1 var(--pixel); padding: 4px 5px; background: var(--g1); color: var(--g3); }
 .badge.ua { background: var(--g2); color: var(--g0); }
-.badge.sess { background: #0f380f; color: #9bbc0f; box-shadow: 0 0 0 2px #8bac0f; }
 
 /* popovers: dialog boxes */
 .pop { position: absolute; top: 62px; z-index: 10; background: var(--g3); color: var(--ink); padding: 16px; display: none; width: 340px;
