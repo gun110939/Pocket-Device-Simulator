@@ -24,6 +24,7 @@ self.MSIM_TH = {
   'Touch: mouse acts like a finger': 'สัมผัส: เมาส์ทำงานแบบนิ้ว',
   'Browser bars (Safari / Chrome)': 'แถบเบราว์เซอร์ (Safari / Chrome)',
   'Virtual keyboard': 'คีย์บอร์ดเสมือน',
+  'Edge-to-edge screen (like DevTools / app)': 'หน้าเว็บเต็มจอ (แบบ DevTools / แอป)',
   'Show safe-area guides': 'แสดงเส้นขอบ safe area',
   'Page language': 'ภาษาของหน้าเว็บ',
   'Browser default': 'ตามเบราว์เซอร์',

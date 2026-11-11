@@ -139,6 +139,25 @@ const suites = {
     assert.equal(await b.ev(`${F(1)}.localStorage.getItem('k')`), null, 'storage is per device');
   },
 
+  async edge(b) {
+    await b.enable();
+    // default: the page fills the whole screen and the status bar floats over it
+    assert.equal(await b.ev(`${F()}.innerHeight`), 874, 'viewport is the full screen height');
+    assert.equal(await b.ev(`${R}.querySelector('iframe').getBoundingClientRect().top === ${R}.querySelector('.screen').getBoundingClientRect().top`), true, 'page starts at the top of the screen');
+    await sleep(1500);
+    assert.equal(await b.ev(`getComputedStyle(${R}.querySelector('.status')).color`), 'rgb(255, 255, 255)', 'white status text on a red header');
+    assert.equal(await b.ev(`getComputedStyle(${R}.querySelector('.status')).visibility`), 'hidden', 'no clock over a page without viewport-fit=cover');
+    await clickUI(b, '.settings');
+    await sleep(300);
+    await setUI(b, '.set-edge', false);
+    await sleep(600);
+    assert.equal(await b.ev(`${F()}.innerHeight`), 820, 'status bar above the page when turned off');
+    await setUI(b, '.set-edge', true);
+    await setUI(b, '.set-bars', true);
+    await sleep(600);
+    assert.equal(await b.ev(`getComputedStyle(${R}.querySelector('.status')).position`), 'static', 'browser bars use a real status bar');
+  },
+
   async navsync(b) {
     await b.enable();
     await pickDevice(b, 'Pixel 9', true);
@@ -179,7 +198,7 @@ const suites = {
   },
 };
 
-const START = { navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
+const START = { edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
 
 const server = spawn('python3', ['-I', join(ROOT, 'tests/fixture_server.py'), '8765'], { stdio: 'ignore' });
 await sleep(800);

@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pixel Café — demo page for Pocket Device Simulator</title>
 <style>
   :root { --ink: #1f2a1f; --soft: #5b6b5b; --bg: #f6f3ea; --card: #fff; --accent: #2f7d4a; --accent2: #e7b94a; }
   * { box-sizing: border-box; }
   body { margin: 0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; color: var(--ink); background: var(--bg); }
-  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px;
+  header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: calc(14px + env(safe-area-inset-top, 0px)) 20px 14px;
     background: rgba(246, 243, 234, .92); backdrop-filter: blur(8px); border-bottom: 1px solid #e3ddcc; }
   .brand { font-weight: 800; letter-spacing: -.02em; font-size: 20px; }
   .brand span { color: var(--accent); }
@@ -32,7 +32,7 @@
   .card h3 { margin: 0 0 2px; font-size: 16px; }
   .card p { margin: 0; color: var(--soft); font-size: 13px; }
   .price { margin-left: auto; font-weight: 800; }
-  .bp { position: fixed; right: 10px; bottom: 10px; padding: 4px 9px; border-radius: 8px; background: var(--ink); color: #fff; font: 600 12px/1.4 ui-monospace, monospace; }
+  .bp { position: fixed; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); padding: 4px 9px; border-radius: 8px; background: var(--ink); color: #fff; font: 600 12px/1.4 ui-monospace, monospace; }
   .bp::after { content: "xs · 1 column"; }
   footer { padding: 26px 20px 60px; color: var(--soft); font-size: 13px; border-top: 1px solid #e3ddcc; }
 

@@ -118,6 +118,7 @@ button, input, select { font: inherit; color: inherit; }
 }
 .status { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 22px;
   background: #fff; color: #000; font: 600 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.status.over { position: absolute; left: 0; right: 0; top: 0; z-index: 3; background: transparent; pointer-events: none; }
 .status .icons { display: flex; gap: 6px; align-items: center; }
 .sig { display: flex; gap: 2px; align-items: flex-end; height: 11px; }
 .sig i { width: 3px; background: currentColor; border-radius: 1px; }

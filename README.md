@@ -62,6 +62,8 @@ Regenerate these images with `node docs/screenshots.mjs`.
 - **Identity**: tab-scoped User-Agent header (client hints removed) and matching JavaScript values
   (`navigator`, `screen`, `devicePixelRatio`, orientation, touch, `matchMedia` pointer/hover).
 - **Touch**: the mouse acts like a finger (touch events, drag-to-scroll with momentum, tap → click).
+- **Edge-to-edge screen** by default, like Chrome DevTools and app WebViews: the page fills the whole
+  screen and the status bar floats over it (switch it off in Settings to put the status bar above the page).
 - **Browser bars**, **safe-area insets** (`env(safe-area-inset-*)` with `viewport-fit=cover`) and a
   **virtual keyboard** (iOS / Android looks, numeric pad) that types into the page.
 - **Several devices side by side** with synced scrolling and navigation.

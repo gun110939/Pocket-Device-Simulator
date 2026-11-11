@@ -122,6 +122,7 @@
     <h4>${T("Settings")}</h4>
     <div class="row2"><span>${T("Touch: mouse acts like a finger")}</span><label class="toggle"><input type="checkbox" class="set-touch"><span></span></label></div>
     <div class="row2"><span>${T("Browser bars (Safari / Chrome)")}</span><label class="toggle"><input type="checkbox" class="set-bars"><span></span></label></div>
+    <div class="row2"><span>${T('Edge-to-edge screen (like DevTools / app)')}</span><label class="toggle"><input type="checkbox" class="set-edge"><span></span></label></div>
     <div class="row2"><span>${T("Virtual keyboard")}</span><label class="toggle"><input type="checkbox" class="set-kbd"><span></span></label></div>
     <div class="row2"><span>${T("Show safe-area guides")}</span><label class="toggle"><input type="checkbox" class="set-safe"><span></span></label></div>
     <div class="row2"><span>${T('Separate sessions per device')}</span><label class="toggle"><input type="checkbox" class="set-iso"><span></span></label></div>
@@ -230,15 +231,28 @@
   };
 
   const ui = () => (state.ui = state.ui || { bars: false, keyboard: true, guides: false });
+  // Edge to edge: the viewport is the whole screen and the status bar floats over the page, as in
+  // Chrome DevTools, app WebViews and installed web apps. Browser bars need a real status bar.
+  const edgeToEdge = () => ui().edge !== false && !ui().bars;
   // Safe-area insets Safari reports for this device, orientation and browser-bar mode.
   function safeInsets(inst, d) {
-    if (!['island', 'notch'].includes(d.style) || inst.folded === false && lookup(inst.id).fold) return { t: 0, r: 0, b: 0, l: 0 };
-    if (inst.landscape) {
+    const notchy = ['island', 'notch'].includes(d.style);
+    const phoneLike = PHONE_STYLES.includes(d.style);
+    const unfoldedBook = lookup(inst.id).fold && inst.folded === false && lookup(inst.id).fold.kind === 'book';
+    // landscape phones: Safari keeps the sides clear of the cut-out
+    if (inst.landscape && notchy && !unfoldedBook) {
       const side = d.style === 'island' ? 62 : 47;
       return { t: 0, r: side, b: 21, l: side };
     }
-    return { t: 0, r: 0, b: ui().bars ? 0 : 34, l: 0 };
+    if (inst.landscape && phoneLike && !unfoldedBook) return { t: 0, r: 0, b: 0, l: 0 };
+    // Edge to edge the page sits under the status bar, so a page that opts in gets its height on top.
+    let top = 0;
+    if (edgeToEdge() && d.bar) top = d.style === 'island' ? (d.w >= 402 ? 62 : 59) : d.style === 'notch' ? 47 : d.bar;
+    const homeIndicator = notchy || (d.style === 'tablet' && d.os === 'ios') || d.style === 'punch';
+    const bottom = ui().bars || !homeIndicator ? 0 : d.style === 'tablet' ? 20 : d.os === 'ios' ? 34 : 16;
+    return { t: top, r: 0, b: bottom, l: 0 };
   }
+
 
   const newSid = () => Math.random().toString(36).slice(2, 10);
   const cfgFor = (inst) => {
@@ -309,6 +323,8 @@
     const phoneLike = PHONE_STYLES.includes(d.style);
     const unfoldedBook = base.fold && !inst.folded && base.fold.kind === 'book';
     const barH = landscape && phoneLike && !unfoldedBook ? 0 : d.bar || 0;
+    const edge = edgeToEdge();
+    const layoutBar = edge ? 0 : barH; // height the status bar takes away from the viewport
     const g = geometry(d, landscape);
 
     const finishes = base.finishes || self.MSIM_FINISHES.dark;
@@ -364,7 +380,7 @@
     }
 
     if (barH) {
-      const status = el('div', 'status');
+      const status = el('div', 'status' + (edge ? ' over' : ''));
       status.style.height = barH + 'px';
       if (d.style === 'island' || d.style === 'notch') {
         status.style.padding = `${Math.round(barH * 0.16)}px ${Math.round(Math.min(w, 430) * 0.09)}px 0`;
@@ -386,7 +402,7 @@
     // Landscape on notch/island phones: without viewport-fit=cover Safari keeps the page clear
     // of the cut-out with side margins in the page's background colour.
     const sa = safeInsets(inst, d);
-    if (landscape && (sa.l || sa.r) && !v.cover) {
+    if (landscape && (sa.l || sa.r) && !v.cover && !edge) {
       v.iframe.style.margin = `0 ${sa.r}px 0 ${sa.l}px`;
       v.iframe.style.width = `calc(100% - ${sa.l + sa.r}px)`;
       v.screen.style.background = v.pageBg || '#fff';
@@ -397,7 +413,7 @@
     }
     if (ui().guides && (sa.t || sa.r || sa.b || sa.l)) {
       const gd = el('div', 'guides', v.screen);
-      Object.assign(gd.style, { borderWidth: `${sa.t + barH}px ${sa.r}px ${sa.b}px ${sa.l}px` });
+      Object.assign(gd.style, { borderWidth: `${sa.t + layoutBar}px ${sa.r}px ${sa.b}px ${sa.l}px` });
     }
 
     const cut = (css) => Object.assign(el('div', 'cutout', v.screen).style, css);
@@ -474,7 +490,7 @@
         <select class="rpreset" title="Common sizes"><option value="">${T("Sizes")}</option>${RESP_SIZES.map(([a, b]) => `<option value="${a}x${b}">${a}×${b}</option>`).join('')}</select>
         <select class="rdpr" title="${T("Pixel ratio")}">${[1, 2, 3].map((x) => `<option value="${x}" ${x === d.dpr ? 'selected' : ''}>@${x}x</option>`).join('')}</select>
         <button class="btn rmode ${inst.desktop ? 'on' : ''}" title="Identity: mobile (touch, mobile UA) or desktop">${T(inst.desktop ? 'Desktop' : 'Mobile')}</button>`
-      : `<span class="meta">${w}×${h - barH} @${d.dpr}x</span>`}
+      : `<span class="meta">${w}×${h - layoutBar} @${d.dpr}x</span>`}
       <button class="btn fin" title="Finish: ${escapeHtml(finish.name)} (click for the next colour)"><i style="background:${finish.metal}"></i></button>
       <button class="btn rot" title="${T("Rotate")}">${I('rotate')}</button>
       ${base.fold ? `<button class="btn fold ${inst.folded ? '' : 'on'}" title="${T("Fold / unfold")}">${I('fold')}${T(inst.folded ? 'Unfold' : 'Fold')}</button>` : ''}
@@ -498,6 +514,7 @@
     if (rm) rm.onclick = () => removeDevice(i);
 
     v.slot.classList.toggle('active', i === state.active && state.devices.length > 1);
+    tintStatus(v);
     tickClock();
   }
 
@@ -530,6 +547,31 @@
     if (!text) return c && c.remove();
     if (!c) c = el('div', 'chip', v.slot);
     c.textContent = text;
+  }
+
+  // A floating status bar picks black or white text from the colour of the page behind it.
+  function pageTopColor(v) {
+    const doc = v.iframe.contentDocument, win = v.iframe.contentWindow;
+    let n = doc.elementFromPoint(win.innerWidth / 2, 6);
+    for (; n; n = n.parentElement) {
+      const cs = win.getComputedStyle(n);
+      const m = cs.backgroundImage.match(/rgba?\([^)]+\)/);
+      const c = (m && m[0]) || cs.backgroundColor;
+      const p = c.match(/[\d.]+/g);
+      if (p && (p.length < 4 || Number(p[3]) > 0.5)) return p.slice(0, 3).map(Number);
+    }
+    return [255, 255, 255];
+  }
+  function tintStatus(v) {
+    const bar = v.screen.querySelector('.status.over');
+    if (!bar) return;
+    // Only pages that declare viewport-fit=cover leave room for the clock; on others it would
+    // sit on top of their content, so just the camera cut-out shows (as in DevTools or Replit).
+    bar.style.visibility = v.cover ? '' : 'hidden';
+    try {
+      const [r, g, b] = pageTopColor(v);
+      bar.style.color = 0.299 * r + 0.587 * g + 0.114 * b < 150 ? '#fff' : '#000';
+    } catch {} // cross-origin for a moment
   }
 
   function updateHost(v) {
@@ -1052,6 +1094,7 @@
       v.cover = data.cover;
       v.pageBg = data.bg && data.bg !== 'rgba(0, 0, 0, 0)' ? data.bg : '#fff';
       if (changed && state.devices[from].landscape) shapeView(from);
+      tintStatus(v);
       return;
     }
     if (data.type === 'intent') {
@@ -1516,6 +1559,8 @@
     scheduleLayout();
   };
   $('.set-bars').onchange = (e) => setUi({ bars: e.target.checked });
+  $('.set-edge').checked = ui().edge !== false;
+  $('.set-edge').onchange = (e) => setUi({ edge: e.target.checked });
   $('.set-kbd').onchange = (e) => {
     setUi({ keyboard: e.target.checked });
     if (!e.target.checked) views.forEach((v) => hideKeyboard(v));
@@ -1628,6 +1673,7 @@
   setUrl(currentUrl);
   rebuildAll();
   updateShotRows();
+  setInterval(() => views.forEach(tintStatus), 1200);
   const staleTimer = setInterval(() => {
     if (!alive()) {
       clearInterval(staleTimer);

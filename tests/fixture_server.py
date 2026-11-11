@@ -13,6 +13,10 @@ class H(http.server.BaseHTTPRequestHandler):
             time.sleep(5)
             self.send_response(200); self.send_header('Content-Type','image/svg+xml'); self.end_headers()
             self.wfile.write(b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'); return
+        if p.startswith('/apphdr'):
+            # an app-style page: full-bleed coloured header that leaves its own room for the notch
+            self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()
+            self.wfile.write(b'<!doctype html><meta name=viewport content="width=device-width"><style>body{margin:0}#h{padding:48px 16px 12px;background:linear-gradient(90deg,rgb(224,58,36),rgb(200,50,30));color:#fff}</style><div id="h">Promotions</div><p>content</p>'); return
         if p.startswith('/loop'):
             # like many real sites: rewrites its own URL on every load (tracking id) and finishes loading slowly
             self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()
