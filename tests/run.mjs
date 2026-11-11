@@ -139,6 +139,14 @@ const suites = {
     assert.equal(await b.ev(`${F(1)}.localStorage.getItem('k')`), null, 'storage is per device');
   },
 
+  async embed(b) {
+    await b.enable();
+    await sleep(2000);
+    assert.equal(await b.ev('location.host'), '127.0.0.1:8765', "the page's own cross-origin iframe does not move the tab");
+    assert.equal(await b.ev(`${F()}.location.pathname`), '/embed', 'the device shows the page');
+    assert.equal(await b.ev(`!!${F()}.document.querySelector('iframe')`), true, 'the embed stays inside the device');
+  },
+
   async edge(b) {
     await b.enable();
     // default: the page fills the whole screen and the status bar floats over it
@@ -198,7 +206,7 @@ const suites = {
   },
 };
 
-const START = { edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
+const START = { embed: '/embed', edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', sessions: '/', emulation: '/dark' };
 
 const server = spawn('python3', ['-I', join(ROOT, 'tests/fixture_server.py'), '8765'], { stdio: 'ignore' });
 await sleep(800);

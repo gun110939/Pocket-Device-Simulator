@@ -13,6 +13,10 @@ class H(http.server.BaseHTTPRequestHandler):
             time.sleep(5)
             self.send_response(200); self.send_header('Content-Type','image/svg+xml'); self.end_headers()
             self.wfile.write(b'<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>'); return
+        if p.startswith('/embed'):
+            # a page with its own cross-origin iframe (like a YouTube embed)
+            self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()
+            self.wfile.write(b'<!doctype html><meta name=viewport content="width=device-width"><h1>EMBED</h1><iframe src="http://localhost:8765/page2" width="300" height="150"></iframe>'); return
         if p.startswith('/apphdr'):
             # an app-style page: full-bleed coloured header that leaves its own room for the notch
             self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()

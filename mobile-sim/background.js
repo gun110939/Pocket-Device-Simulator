@@ -255,8 +255,21 @@ chrome.webNavigation.onReferenceFragmentUpdated.addListener(async (d) => {
   if (state && d.frameId !== 0) await onInnerNavigation(d, state);
 });
 
+// Is this frame one of the simulator's device viewports? The original page's own iframes (a
+// YouTube embed, an ad) can commit before the shell replaces the page; they must be ignored.
+async function isDeviceFrame(tabId, frameId) {
+  try {
+    const [r] = await chrome.scripting.executeScript({ target: { tabId, frameIds: [frameId] }, injectImmediately: true,
+      func: () => String(window.name).startsWith('msim:') });
+    return !!(r && r.result);
+  } catch {
+    return false;
+  }
+}
+
 async function onInnerNavigation(d, state) {
   if (d.parentFrameId !== 0 || !/^https?:/.test(d.url)) return;
+  if (!(await isDeviceFrame(d.tabId, d.frameId))) return;
   const top = await chrome.webNavigation.getFrame({ tabId: d.tabId, frameId: 0 }).catch(() => null);
   await setState(d.tabId, { ...state, url: d.url });
   if (top && new URL(top.url).origin !== new URL(d.url).origin) {

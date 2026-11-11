@@ -27,6 +27,15 @@
     shellRoot.querySelector('.app').appendChild(o);
   }
   let shellRoot = null;
+  // chrome.storage throws once the extension has been reloaded under this tab
+  const putLocal = async (obj) => {
+    if (!alive()) return showStale();
+    try {
+      await chrome.storage.local.set(obj);
+    } catch {
+      if (!alive()) showStale();
+    }
+  };
   const send = async (msg) => {
     if (!alive()) {
       showStale();
@@ -1403,7 +1412,7 @@
             e.stopPropagation();
             if (state.devices.some((x) => x.id === d.id)) return toast(T('Remove it from the tab first'));
             customs = customs.filter((x) => x.id !== d.id);
-            await chrome.storage.local.set({ customDevices: customs });
+            await putLocal({ customDevices: customs });
             renderPicker();
           };
         }
@@ -1433,7 +1442,7 @@
           const dev = { ...identity, cat: 'custom', id: 'custom-' + Date.now(), name: val('.f-name') || `Custom ${w}×${h}`, w, h, dpr };
           if (val('.f-ua')) dev.ua = val('.f-ua');
           customs = [...customs, dev];
-          await chrome.storage.local.set({ customDevices: customs });
+          await putLocal({ customDevices: customs });
           toast(T('Custom device saved'));
           renderPicker();
         };
@@ -1472,14 +1481,14 @@
     const q = (x) => box.querySelector(x);
     q('.set-lang').onchange = async (e) => {
       prefs.lang = e.target.value;
-      await chrome.storage.local.set({ lang: prefs.lang });
+      await putLocal({ lang: prefs.lang });
       await save({ lang: prefs.lang });
       renameAll();
       reloadAll();
     };
     const applyGeo = async (geo) => {
       prefs.geo = geo;
-      await chrome.storage.local.set({ geo });
+      await putLocal({ geo });
       renameAll();
       reloadAll();
     };
@@ -1497,20 +1506,20 @@
       else toast(T('Latitude, longitude') + '?', 1600);
     };
     q('.set-ui').onchange = async (e) => {
-      await chrome.storage.local.set({ uiLang: e.target.value });
+      await putLocal({ uiLang: e.target.value });
       location.reload(); // rebuilds the shell in the new language
     };
     q('.set-save').onclick = async () => {
       const name = q('.set-name').value.trim() || state.devices.map((d) => lookup(d.id).name).join(' + ');
       prefs.deviceSets = [...(prefs.deviceSets || []), { name, devices: JSON.parse(JSON.stringify(state.devices)) }];
-      await chrome.storage.local.set({ deviceSets: prefs.deviceSets });
+      await putLocal({ deviceSets: prefs.deviceSets });
       renderSettingsMore();
       toast(T('Set saved'), 1400);
     };
     for (const b of box.querySelectorAll('.set-load')) b.onclick = () => loadSet(prefs.deviceSets[Number(b.dataset.n)]);
     for (const b of box.querySelectorAll('.set-del')) b.onclick = async () => {
       prefs.deviceSets.splice(Number(b.dataset.n), 1);
-      await chrome.storage.local.set({ deviceSets: prefs.deviceSets });
+      await putLocal({ deviceSets: prefs.deviceSets });
       renderSettingsMore();
     };
   }
