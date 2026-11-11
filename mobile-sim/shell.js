@@ -124,6 +124,8 @@
     <h4>${T("Sync between devices")}</h4>
     <div class="row2"><span>${T("Scroll position")}</span><label class="toggle"><input type="checkbox" class="sync-scroll"><span></span></label></div>
     <div class="row2"><span>${T("Navigation (links, back)")}</span><label class="toggle"><input type="checkbox" class="sync-nav"><span></span></label></div>
+    <div class="row2"><span>${T("Mirror taps (screens match, no reload)")}</span><label class="toggle"><input type="checkbox" class="sync-tap"><span></span></label></div>
+    <div class="note">${T("Mirror taps runs each tap in every device, so actions such as Pay or Submit happen once per device.")}</div>
     <div class="note">${T("The User-Agent header is per tab, so it follows the device marked UA. Each device still reports its own identity to page scripts.")}</div>
   </div>
 
@@ -267,7 +269,7 @@
     const d = devOf(inst);
     return { ua: d.ua, platform: d.platform, vendor: d.vendor, touch: d.touch, os: d.os, dpr: d.dpr, w: d.w, h: d.h,
       landscape: !!inst.landscape, mobileHint: /Mobile/.test(d.ua), touchEmu: state.touchEmu !== false, safe: safeInsets(inst, d),
-      lang: prefs.lang || '', geo: prefs.geo || null, sid: inst.sid };
+      lang: prefs.lang || '', geo: prefs.geo || null, sid: inst.sid, mirror: !!(state.sync && state.sync.tap) };
   };
 
   const PHONE_STYLES = ['island', 'notch', 'punch', 'classic', 'cover'];
@@ -372,10 +374,12 @@
       const b = el('div', 'sbtn ' + (side === 'L' || side === 'R' ? 'v' : 'h') + (kind ? ' ' + kind : ''), v.body);
       const along = side === 'L' || side === 'R' ? (landscape ? PW : PH) : (landscape ? PH : PW);
       const pos = Math.round(at * along) + 'px', size = Math.max(6, Math.round(len * along)) + 'px';
-      if (side === 'L') Object.assign(b.style, { left: '-3px', top: pos, height: size });
-      if (side === 'R') Object.assign(b.style, { right: '-3px', top: pos, height: size });
-      if (side === 'T') Object.assign(b.style, { top: '-3px', left: pos, width: size });
-      if (side === 'B') Object.assign(b.style, { bottom: '-3px', left: pos, width: size });
+      // Camera Control sits flush with the band; the other keys stick out 3px
+      const out = kind === 'camctl' ? '-1px' : '-3px';
+      if (side === 'L') Object.assign(b.style, { left: out, top: pos, height: size });
+      if (side === 'R') Object.assign(b.style, { right: out, top: pos, height: size });
+      if (side === 'T') Object.assign(b.style, { top: out, left: pos, width: size });
+      if (side === 'B') Object.assign(b.style, { bottom: out, left: pos, width: size });
     }
 
     // earpiece slit in the bezel above the screen
@@ -1063,26 +1067,36 @@
       toast(T('Navigation sync paused: this page keeps changing its address'), 3500);
       return;
     }
+    const lead = views[from];
     views.forEach((v, j) => {
       if (j === from || v.lastUrl === url) return;
-      const same = (() => {
-        try {
-          return new URL(v.lastUrl).origin === new URL(url).origin;
-        } catch {
-          return false;
-        }
-      })();
-      v.lastUrl = url;
-      v.followUntil = performance.now() + 4000;
-      // In-app route change: let the page's router follow without a reload.
-      if (spa && same) {
-        try {
-          return v.iframe.contentWindow.postMessage({ msim: true, type: 'go', url }, '*');
-        } catch {}
+      // This device got the same tap and is changing screen on its own; step in only if it didn't.
+      if (now < (v.mirrorUntil || 0)) {
+        clearTimeout(v.mirrorCheck);
+        v.mirrorCheck = setTimeout(() => {
+          if (views[j] !== v || v.lastUrl === url || v.loading || lead.lastUrl !== url) return;
+          followTo(v, url, spa);
+        }, v.mirrorUntil - now);
+        return;
       }
-      setLoading(v, true);
-      v.iframe.src = url;
+      followTo(v, url, spa);
     });
+  }
+  function followTo(v, url, spa) {
+    let same = false;
+    try {
+      same = new URL(v.lastUrl).origin === new URL(url).origin;
+    } catch {}
+    v.lastUrl = url;
+    v.followUntil = performance.now() + 4000;
+    // In-app route change: let the page's router follow without a reload.
+    if (spa && same) {
+      try {
+        return v.iframe.contentWindow.postMessage({ msim: true, type: 'go', url }, '*');
+      } catch {}
+    }
+    setLoading(v, true);
+    v.iframe.src = url;
   }
 
   window.addEventListener('message', (e) => {
@@ -1136,8 +1150,22 @@
         navigateOthers(from, data.url, data.spa);
       }
     } else if (data.type === 'scroll' && state.sync.scroll && views.length > 1) {
+      const { top, path, tags, tag, rx, ry } = data;
       views.forEach((v, j) => {
-        if (j !== from) v.iframe.contentWindow.postMessage({ msim: true, type: 'scrollTo', rx: data.rx, ry: data.ry }, '*');
+        if (j !== from) v.iframe.contentWindow.postMessage({ msim: true, type: 'scrollTo', top, path, tags, tag, rx, ry }, '*');
+      });
+    } else if (data.type === 'tap' && state.sync.tap && views.length > 1) {
+      // Replay the tap in every device that shows the same page, so each app changes screen itself.
+      const src = views[from];
+      const { path, tags, tag, text, nth, rx, ry } = data;
+      src.followUntil = 0;
+      views.forEach((v, j) => {
+        if (j === from || v.lastUrl !== src.lastUrl) return;
+        v.mirrorUntil = performance.now() + 5000;
+        v.followUntil = performance.now() + 5000;
+        try {
+          v.iframe.contentWindow.postMessage({ msim: true, type: 'tap', path, tags, tag, text, nth, rx, ry }, '*');
+        } catch {}
       });
     }
   });
@@ -1615,6 +1643,15 @@
   $('.sync-nav').checked = !!state.sync.nav;
   $('.sync-scroll').onchange = (e) => save({ sync: { ...state.sync, scroll: e.target.checked } });
   $('.sync-nav').onchange = (e) => save({ sync: { ...state.sync, nav: e.target.checked } });
+  $('.sync-tap').checked = !!state.sync.tap;
+  $('.sync-tap').onchange = async (e) => {
+    await save({ sync: { ...state.sync, tap: e.target.checked } });
+    views.forEach((v, i) => {
+      try {
+        v.iframe.contentWindow.postMessage({ msim: true, type: 'config', cfg: cfgFor(state.devices[i]) }, '*');
+      } catch {}
+    });
+  };
   zoomSel.value = String(state.zoom || 'fit');
   zoomSel.onchange = () => {
     state.zoom = zoomSel.value;

@@ -20,6 +20,16 @@ class H(http.server.BaseHTTPRequestHandler):
 <script>window.__boots=(window.__boots||0)+1;const render=()=>{document.getElementById('view').textContent='route:'+location.pathname};
 document.addEventListener('click',e=>{const a=e.target.closest('a');if(!a)return;e.preventDefault();history.pushState({r:a.pathname},'',a.href);render();});
 addEventListener('popstate',render);render();</script>'''); return
+        if p.startswith('/mirror'):
+            # an app like React Navigation: a tap pushes a screen and keeps the old one mounted; a
+            # popstate it did not make rebuilds everything (a remount); the list scrolls inside a <div>
+            self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()
+            self.wfile.write(b'''<!doctype html><meta name=viewport content="width=device-width"><style>body{margin:0}#list{height:300px;overflow:auto}#list p{margin:0;padding:10px}</style><div id="app"></div>
+<script>window.__taps=0;window.__remounts=0;const app=document.getElementById('app');
+const screen=(name)=>{const s=document.createElement('section');s.className='screen';s.innerHTML='<h1 class="title">'+name+'</h1><span class="clock">'+Math.random().toString(36).slice(2,7)+'</span><button class="next" style="font-size:30px;padding:10px 40px">Next</button><div id="list">'+Array.from({length:80},(_, i)=>'<p>row '+i+'</p>').join('')+'</div>';return s;};
+const build=()=>{app.textContent='';app.appendChild(screen('route:'+location.pathname));};
+app.addEventListener('click',e=>{if(!e.target.closest('.next'))return;window.__taps++;history.pushState({n:window.__taps},'','/mirror/'+(window.__taps+1));app.appendChild(screen('route:'+location.pathname));});
+addEventListener('popstate',()=>{window.__remounts++;build();});build();</script>'''); return
         if p.startswith('/embed'):
             # a page with its own cross-origin iframe (like a YouTube embed)
             self.send_response(200); self.send_header('Content-Type','text/html'); self.end_headers()

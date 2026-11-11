@@ -170,7 +170,7 @@
   };
   // [side, start, length] in fractions of the portrait body: L/R along the height, T along the width.
   const BTN = {
-    iphoneCam: [['L', .19, .045, 'action'], ['L', .265, .085], ['L', .37, .085], ['R', .285, .125], ['R', .62, .075, 'cam']],
+    iphoneCam: [['L', .19, .045, 'action'], ['L', .265, .085], ['L', .37, .085], ['R', .285, .125], ['R', .62, .075, 'camctl']],
     iphoneAction: [['L', .19, .045, 'action'], ['L', .265, .085], ['L', .37, .085], ['R', .285, .125]],
     iphoneRing: [['L', .19, .035, 'ring'], ['L', .265, .085], ['L', .37, .085], ['R', .285, .125]],
     se: [['L', .15, .035, 'ring'], ['L', .225, .07], ['L', .31, .07], ['R', .19, .08]],
@@ -179,7 +179,7 @@
     fold: [['R', .3, .12], ['R', .45, .08]],
     flip: [['R', .36, .1], ['R', .47, .06]],
     // Apple lists volume, Camera Control and a side button with Touch ID; positions here are approximate.
-    duo: [['L', .22, .11], ['L', .36, .11], ['R', .2, .15, 'touchid'], ['R', .58, .1, 'cam']],
+    duo: [['L', .22, .11], ['L', .36, .11], ['R', .2, .15, 'touchid'], ['R', .58, .1, 'camctl']],
     ipad: [['T', .82, .08], ['R', .09, .06], ['R', .16, .06]],
     tab: [['R', .1, .06], ['R', .18, .1]],
     watch: [['R', .58, .16, 'flat']],

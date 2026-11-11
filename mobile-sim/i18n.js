@@ -129,4 +129,6 @@ self.MSIM_TH = {
   'Could not apply:': 'ใช้ค่าไม่สำเร็จ:',
   'Accurate mode off': 'ปิดโหมดแม่นยำแล้ว',
   'Navigation sync paused: this page keeps changing its address': 'พักการซิงก์การนำทางชั่วคราว: หน้านี้เปลี่ยน URL ตัวเองตลอด',
+  'Mirror taps (screens match, no reload)': 'แตะพร้อมกันทุกเครื่อง (หน้าจอตรงกัน ไม่รีโหลด)',
+  'Mirror taps runs each tap in every device, so actions such as Pay or Submit happen once per device.': 'โหมดแตะพร้อมกันจะกดซ้ำในทุกเครื่อง ปุ่มอย่าง ชำระเงิน หรือ ส่งข้อมูล จึงทำงานครั้งละเครื่อง (ซ้ำตามจำนวนเครื่อง)',
 };

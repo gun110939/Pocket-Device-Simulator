@@ -110,7 +110,10 @@ button, input, select { font: inherit; color: inherit; }
 .sbtn.v { width: 4px; background: linear-gradient(90deg, var(--m-lo), var(--m-hi) 45%, var(--metal) 60%, var(--m-lo)); }
 .sbtn.h { height: 4px; background: linear-gradient(180deg, var(--m-lo), var(--m-hi) 45%, var(--metal) 60%, var(--m-lo)); }
 .sbtn.ring, .sbtn.action { border-radius: 3px; }
-.sbtn.cam { background: linear-gradient(90deg, #111214, #3a3c41 50%, #111214); box-shadow: 0 0 0 1px var(--m-lo); }
+/* Camera Control: a flush sapphire key in a thin metal surround, not a raised button */
+.sbtn.camctl { width: 3px; border-radius: 1.5px; background: linear-gradient(90deg, #0b0c0e, #2a2c31 55%, #121316);
+  box-shadow: 0 0 0 1px var(--m-hi), 0 0 0 1.5px var(--m-lo), inset 0 1px 0 rgba(255,255,255,.18); }
+.sbtn.h.camctl { height: 3px; background: linear-gradient(180deg, #0b0c0e, #2a2c31 55%, #121316); }
 .sbtn.touchid { box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); }
 .sbtn.flat { width: 3px; }
 .ear { position: absolute; z-index: 2; border-radius: 2px; background: linear-gradient(#0e0f11, #26282c); box-shadow: 0 0 0 1px rgba(255,255,255,.04); }

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Pocket Device Simulator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Open the current page inside a phone or tablet frame, with a matching mobile user agent.",
   "permissions": [
     "declarativeNetRequest",

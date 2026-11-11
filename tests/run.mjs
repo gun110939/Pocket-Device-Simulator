@@ -134,6 +134,43 @@ const suites = {
     assert.equal(await b.ev(`${F(1)}.__boots`), 1, 'the app was not restarted');
   },
 
+  async mirror(b) {
+    await b.enable();
+    await pickDevice(b, 'Pixel 9', true);
+    await sleep(1000);
+    await b.ev(`(()=>{window.__loads=[0,0]; [...${R}.querySelectorAll('iframe')].forEach((f,i)=>f.addEventListener('load',()=>window.__loads[i]++)); return 1})()`);
+    const tap = async () => {
+      const pt = await b.ev(`(()=>{const f=${R}.querySelector('iframe'); const fr=f.getBoundingClientRect(); const s=fr.width/f.contentWindow.innerWidth; const n=[...f.contentDocument.querySelectorAll('.next')].pop(); n.scrollIntoView(); const r=n.getBoundingClientRect(); return [fr.left+(r.left+r.width/2)*s, fr.top+(r.top+r.height/2)*s]})()`);
+      await b.mouse('mousePressed', pt[0], pt[1], 1);
+      await sleep(60);
+      await b.mouse('mouseReleased', pt[0], pt[1]);
+      await sleep(1200);
+    };
+    // off by default: the tap stays in the device it was made in
+    await tap();
+    assert.equal(await b.ev(`${F(1)}.__taps`), 0, 'taps are not mirrored unless turned on');
+    await b.ev(`(()=>{const t=${R}.querySelector('.sync-tap'); t.checked=true; t.dispatchEvent(new Event('change')); return 1})()`);
+    await sleep(500);
+    // line both devices up on the same screen, then tag what the follower shows
+    await b.ev(`[...${R}.querySelectorAll('iframe')].forEach(f=>f.src='/mirror/1')`);
+    await sleep(2000);
+    await b.ev(`(()=>{window.__loads=[0,0]; [...${R}.querySelectorAll('iframe')].forEach((f,i)=>f.addEventListener('load',()=>window.__loads[i]++)); return 1})()`);
+    await b.ev(`${F(1)}.__kept = ${F(1)}.document.querySelector('.screen')`);
+    await tap();
+    assert.equal(await b.ev(`${F(1)}.__taps`), 1, 'the tap ran in the other device');
+    assert.equal(await b.ev(`${F(1)}.location.pathname`), '/mirror/2', 'the other device changed screen');
+    assert.equal(await b.ev(`${F(1)}.__remounts`), 0, 'the other app was not rebuilt');
+    assert.equal(await b.ev(`${F(1)}.__kept.isConnected`), true, 'the previous screen stays mounted, as in the leading device');
+    await sleep(4500);
+    assert.equal(await b.ev(`${F(1)}.__remounts`), 0, 'address sync did not step in afterwards');
+    assert.deepEqual(await b.ev('window.__loads'), [0, 0], 'no device reloaded');
+    // scrolling a list inside a <div> moves the same list in the other device
+    await b.ev(`(()=>{const l=[...${F(0)}.document.querySelectorAll('#list')].pop(); l.scrollTop=(l.scrollHeight-l.clientHeight)/2; return 1})()`);
+    await sleep(700);
+    const ratio = await b.ev(`(()=>{const l=[...${F(1)}.document.querySelectorAll('#list')].pop(); return l.scrollTop/(l.scrollHeight-l.clientHeight)})()`);
+    assert.ok(Math.abs(ratio - 0.5) < 0.05, 'inner list scrolled to the same place, got ' + ratio);
+  },
+
   async embed(b) {
     await b.enable();
     await sleep(2000);
@@ -201,7 +238,7 @@ const suites = {
   },
 };
 
-const START = { spa: '/spa/home', embed: '/embed', edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', emulation: '/dark' };
+const START = { mirror: '/mirror/1', spa: '/spa/home', embed: '/embed', edge: '/apphdr', navsync: '/', core: '/', devices: '/', screenshots: '/', touch: '/touch', keyboard: '/kbd', safearea: '/safe', prefs: '/', emulation: '/dark' };
 
 const server = spawn('python3', ['-I', join(ROOT, 'tests/fixture_server.py'), '8765'], { stdio: 'ignore' });
 await sleep(800);

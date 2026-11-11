@@ -66,8 +66,10 @@ Regenerate these images with `node docs/screenshots.mjs`.
   screen and the status bar floats over it (switch it off in Settings to put the status bar above the page).
 - **Browser bars**, **safe-area insets** (`env(safe-area-inset-*)` with `viewport-fit=cover`) and a
   **virtual keyboard** (iOS / Android looks, numeric pad) that types into the page.
-- **Several devices side by side** with synced scrolling and navigation (follows what you tap;
-  single-page apps change screen without reloading).
+- **Several devices side by side** with synced scrolling (the page and lists that scroll inside it) and
+  navigation (follows what you tap). Turn on **Mirror taps** in Sync to replay each tap in every device,
+  so app screens change together with their own animations instead of being rebuilt. Each device then
+  really runs the action, so a Pay or Submit button fires once per device.
 - **Screenshots**: transparent device PNG, device on a colour, screen only (optionally rounded),
   full page (stitched), all devices in one image, or one PNG per device in a ZIP.
 - **Screen recording** cropped to the device, with optional webcam bubble and microphone.

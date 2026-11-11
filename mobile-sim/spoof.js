@@ -414,23 +414,120 @@
   }
   addEventListener('pagehide', () => post({ type: 'loading' }));
 
-  let suppressUntil = 0;
-  let scrollQueued = false;
+  // ---- mirroring between devices: find "the same element" in another device's copy of the page ----
+  // An element is named by its child-index path from <html>, checked against its tag and text; if the
+  // layout differs (a tablet), the same tag + text is searched for instead.
+  const pathOf = (el) => {
+    const p = [];
+    for (let n = el; n && n.parentElement; n = n.parentElement) p.unshift(Array.prototype.indexOf.call(n.parentElement.children, n));
+    return p;
+  };
+  const tagsOf = (el) => {
+    const t = [];
+    for (let n = el; n && n.parentElement; n = n.parentElement) t.unshift(n.tagName);
+    return t.join('>');
+  };
+  // follow the path, requiring the same tag at every step (text may differ: animations, clocks)
+  const atPath = (p, tags) => {
+    const want = tags ? tags.split('>') : null;
+    let n = document.documentElement;
+    for (let k = 0; k < (p || []).length; k++) {
+      n = n && n.children[p[k]];
+      if (!n || (want && n.tagName !== want[k])) return null;
+    }
+    return n;
+  };
+  // textContent, not innerText: it is the same in every device whatever the layout hides
+  const textOf = (el) => String(el.textContent || el.value || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  const describe = (el) => {
+    const text = textOf(el);
+    const same = text ? [...document.getElementsByTagName(el.tagName)].filter((n) => textOf(n) === text) : [];
+    return { path: pathOf(el), tags: tagsOf(el), tag: el.tagName, text, nth: same.indexOf(el) };
+  };
+  const findSame = (m) => {
+    const el = atPath(m.path, m.tags);
+    if (el && el.tagName === m.tag) return el;
+    if (!m.text) return null;
+    const same = [...document.getElementsByTagName(m.tag)].filter((n) => textOf(n) === m.text);
+    return same[Math.max(0, Math.min(m.nth, same.length - 1))] || null;
+  };
+
+  // A tap the user made here is replayed in the other devices (when "mirror taps" is on).
+  addEventListener('click', (e) => {
+    if (!c.mirror || !e.isTrusted || !(e.target instanceof Element)) return;
+    const r = e.target.getBoundingClientRect();
+    post({ type: 'tap', ...describe(e.target), rx: r.width ? (e.clientX - r.left) / r.width : 0.5, ry: r.height ? (e.clientY - r.top) / r.height : 0.5 });
+  }, true);
+  // Replay it the way a phone delivers a tap, so the app runs its own handlers and transitions.
+  const replayTap = (m) => {
+    const el = findSame(m);
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width * m.rx, y = r.top + r.height * m.ry;
+    const base = { bubbles: true, cancelable: true, composed: true, view: window, clientX: x, clientY: y, screenX: x, screenY: y, button: 0 };
+    const touch = !!c.touch && typeof Touch === 'function';
+    const ptr = (type, buttons) => el.dispatchEvent(new PointerEvent(type, { ...base, buttons, pointerId: touch ? 2 : 1, pointerType: touch ? 'touch' : 'mouse', isPrimary: true, width: touch ? 22 : 1, height: touch ? 22 : 1 }));
+    const tch = (type) => {
+      const t = new Touch({ identifier: 2, target: el, clientX: x, clientY: y, pageX: x + scrollX, pageY: y + scrollY, screenX: x, screenY: y, radiusX: 11, radiusY: 11, force: 1 });
+      const end = type === 'touchend';
+      return el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, composed: true, touches: end ? [] : [t], targetTouches: end ? [] : [t], changedTouches: [t] }));
+    };
+    let ok = ptr('pointerdown', 1);
+    if (touch) ok = tch('touchstart') && ok;
+    ptr('pointerup', 0);
+    if (touch) ok = tch('touchend') && ok;
+    if (!touch || ok) {
+      el.dispatchEvent(new MouseEvent('mousedown', { ...base, buttons: 1, detail: 1 }));
+      el.dispatchEvent(new MouseEvent('mouseup', { ...base, buttons: 0, detail: 1 }));
+      el.dispatchEvent(new MouseEvent('click', { ...base, buttons: 0, detail: 1 }));
+    }
+    const field = el.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]');
+    if (field && field.focus) field.focus();
+  };
+
+  // Scroll sync covers the page and inner scroll areas (single-page apps often scroll a <div>).
+  const quiet = new WeakMap(); // element -> time until which its scroll events are our own echo
+  const queued = new Set();
+  const scrollRoot = () => document.scrollingElement || document.documentElement;
   addEventListener(
     'scroll',
-    () => {
-      if (performance.now() < suppressUntil || scrollQueued) return;
-      scrollQueued = true;
+    (e) => {
+      const el = e.target === document || e.target === window ? scrollRoot() : e.target;
+      if (!(el instanceof Element) || queued.has(el) || performance.now() < (quiet.get(el) || 0)) return;
+      queued.add(el);
       requestAnimationFrame(() => {
-        scrollQueued = false;
-        const el = document.scrollingElement || document.documentElement;
-        const maxY = el.scrollHeight - innerHeight;
-        const maxX = el.scrollWidth - innerWidth;
-        post({ type: 'scroll', ry: maxY > 0 ? scrollY / maxY : 0, rx: maxX > 0 ? scrollX / maxX : 0 });
+        queued.delete(el);
+        const top = el === scrollRoot();
+        const maxY = el.scrollHeight - (top ? innerHeight : el.clientHeight);
+        const maxX = el.scrollWidth - (top ? innerWidth : el.clientWidth);
+        post({ type: 'scroll', ...(top ? {} : { path: pathOf(el), tags: tagsOf(el), tag: el.tagName }), top, ry: maxY > 0 ? el.scrollTop / maxY : 0, rx: maxX > 0 ? el.scrollLeft / maxX : 0 });
       });
     },
-    { passive: true }
+    { capture: true, passive: true }
   );
+  const scrollable = (el) => el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
+  const applyScroll = (m) => {
+    let el = m.top || !m.path ? scrollRoot() : findSame({ ...m, text: '' });
+    if (!el || !scrollable(el)) {
+      if (m.top) return;
+      // layouts differ: take the largest scroll area on the page
+      let best = null, area = 0;
+      for (const n of document.querySelectorAll('*')) {
+        if (n.scrollHeight <= n.clientHeight + 1 && n.scrollWidth <= n.clientWidth + 1) continue;
+        const st = getComputedStyle(n);
+        if (!/(auto|scroll)/.test(st.overflowY + st.overflowX)) continue;
+        const a = n.clientWidth * n.clientHeight;
+        if (a > area) (best = n), (area = a);
+      }
+      if (!(el = best)) return;
+    }
+    const top = el === scrollRoot();
+    quiet.set(el, performance.now() + 150);
+    const maxY = el.scrollHeight - (top ? innerHeight : el.clientHeight);
+    const maxX = el.scrollWidth - (top ? innerWidth : el.clientWidth);
+    if (top) scrollTo(m.rx * maxX, m.ry * maxY);
+    else el.scrollTo(m.rx * maxX, m.ry * maxY);
+  };
   addEventListener('message', (e) => {
     if (e.source !== parentWin || !e.data || e.data.msim !== true) return;
     if (e.data.type === 'config') {
@@ -457,10 +554,7 @@
         if (r.bottom > innerHeight - kbH - 8) scrollBy({ top: r.bottom - (innerHeight - kbH) + 24, behavior: 'smooth' });
       }
     }
-    if (e.data.type === 'scrollTo') {
-      const el = document.scrollingElement || document.documentElement;
-      suppressUntil = performance.now() + 150;
-      scrollTo(e.data.rx * (el.scrollWidth - innerWidth), e.data.ry * (el.scrollHeight - innerHeight));
-    }
+    if (e.data.type === 'scrollTo') applyScroll(e.data);
+    if (e.data.type === 'tap') replayTap(e.data);
   });
 })();
